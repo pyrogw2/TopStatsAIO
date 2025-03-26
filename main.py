@@ -513,9 +513,25 @@ def generate_aggregate():
                 # Add a separator after moving .json.gz files
                 update_terminal_output("\n" + "-" * 50 + "\n")
 
+                # Move the output .json file to the GeneratedAgg folder
+                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+                # Find the .json file in the processed folder
+                for file in os.listdir(processed_folder):
+                    if file.lower().endswith(".json"):
+                        source_path = os.path.join(processed_folder, file)
+                        destination_path = os.path.join(generated_agg_folder, file)
+                        shutil.move(source_path, destination_path)
+                        update_terminal_output("\n" + "-" * 50 + "\n")
+                        update_terminal_output(f"Moved output file to: {destination_path}")
+                        break
+                else:
+                    update_terminal_output("No .json output file found in the processed folder.")
+
                 # Signal that processing is complete
-                update_terminal_output("\n**Process completed successfully! Opening the folder with processed logs...**")
-                os.startfile(processed_folder)  # Open the folder with processed logs
+                update_terminal_output("\n**Process completed successfully! Opening the folder with generated aggregate logs...**")
+                os.startfile(generated_agg_folder)  # Open the GeneratedAgg folder
                 processing_complete.set()
             except Exception as e:
                 update_terminal_output(f"Unexpected error: {e}")
@@ -533,19 +549,40 @@ def generate_aggregate():
                 python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
                 processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
 
-                # Properly escape the paths by wrapping them in quotes
-                command = ["python", f'"{python_script}"', "-i", f'"{processed_folder_path}"']
+                # Properly escape the paths by passing them as a list
+                command = ["python", python_script, "-i", processed_folder_path]
                 update_terminal_output(f"Running Python script: {' '.join(command)}")
 
-                # Run the command
-                result = subprocess.run(" ".join(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+                # Run the command and wait for it to complete
+                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 update_terminal_output(result.stdout.strip())
                 if result.returncode != 0:
                     update_terminal_output(f"Error: {result.stderr.strip()}")
                     return
                 update_terminal_output("Python script completed successfully.")
+
+                # Move the output .json file to the GeneratedAgg folder
+                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+                # Find the .json file in the processed folder
+                for file in os.listdir(processed_folder_path):
+                    if file.lower().endswith(".json"):
+                        source_path = os.path.join(processed_folder_path, file)
+                        destination_path = os.path.join(generated_agg_folder, file)
+                        shutil.move(source_path, destination_path)
+                        update_terminal_output(f"Moved output file to: {destination_path}")
+                        break
+                else:
+                    update_terminal_output("No .json output file found in the processed folder.")
+                    return  # Exit early if no .json file is found
+
+                # Notify the user and open the GeneratedAgg folder
+                update_terminal_output("\n**Process completed successfully! Opening the folder with generated aggregate logs...**")
+                os.startfile(generated_agg_folder)  # Open the GeneratedAgg folder
+
             except Exception as e:
-                update_terminal_output(f"Error running Python script: {e}")
+                update_terminal_output(f"Error running Python script or moving output file: {e}")
 
         # Start the script execution in a separate thread
         threading.Thread(target=wait_and_run_script).start()
