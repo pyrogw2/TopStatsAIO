@@ -454,7 +454,6 @@ def generate_aggregate():
     open_folder_button.pack(pady=5)
 
     def enable_open_folder_button():
-        update_terminal_output("\n**Process completed successfully!**")
         open_folder_button.config(state="normal", style="Green.TButton")  # Enable the button and apply the green style
 
     def process_files():
@@ -761,6 +760,10 @@ def browse_folder(entry_widget):
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, folder)
 
+    # Bring the configuration window back to the top
+    if config_window_instance:
+        config_window_instance.lift()
+
 def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry):
     """Save the changes and close the configuration popup."""
     elite_path = elite_entry.get()
@@ -777,12 +780,29 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, token_ent
         messagebox.showerror("Invalid Path", "Please provide a valid Top Stats Parser Path.")
         return
 
+    # Validate Hour and Minute
+    try:
+        hour = int(hour_entry.get())
+        if hour < 0 or hour > 23:
+            raise ValueError("Hour must be between 0 and 23.")
+    except ValueError:
+        messagebox.showerror("Invalid Hour", "Please enter a valid hour (0-23).")
+        return
+
+    try:
+        minute = int(minute_entry.get())
+        if minute < 0 or minute > 59:
+            raise ValueError("Minute must be between 0 and 59.")
+    except ValueError:
+        messagebox.showerror("Invalid Minute", "Please enter a valid minute (0-59).")
+        return
+
     # Save the configuration
     config["elite_insights_path"] = elite_path
     config["top_stats_path"] = top_stats_path
     config["DPSReportUserToken"] = token  # Save the token even if it's empty
-    config["default_hour"] = int(hour_entry.get())
-    config["default_minute"] = int(minute_entry.get())
+    config["default_hour"] = hour
+    config["default_minute"] = minute
     save_config()
 
     # Update the default time in the main window
@@ -825,5 +845,23 @@ generate_button.grid(row=3, column=0, sticky="e", padx=10, pady=10)  # Align to 
 # Add "Config" button at the bottom-left
 config_button = ttk.Button(root, text="Config", command=open_config_window)
 config_button.grid(row=3, column=0, sticky="w", padx=10, pady=10)
+
+def get_release_version():
+    """Fetch the release version from a local file."""
+    version_file = os.path.join(os.getcwd(), "version.txt")
+    if os.path.exists(version_file):
+        try:
+            with open(version_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return "Unknown Version"
+
+# Fetch the release version
+release_version = get_release_version()
+
+# Add a subtle label for the release version
+release_label = ttk.Label(root, text=f"Release: {release_version}", font=("Arial", 8), foreground="#888888")
+release_label.grid(row=4, column=0, sticky="e", padx=10, pady=5)  # Align to the bottom-right
 
 root.mainloop()
