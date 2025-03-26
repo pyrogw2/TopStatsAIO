@@ -39,7 +39,7 @@ def choose_root_folder():
         populate_tree('', folder)
         config["last_path"] = folder
         save_config()
-        selected_listbox.delete(0, tk.END)
+        selected_tree.delete(*selected_tree.get_children())
         global root_path
         root_path = folder
         selected_path_label.config(text=f"Current Folder: {root_path}")
@@ -114,45 +114,67 @@ def clear_tree_checkboxes(item):
 # App window
 root = tk.Tk()
 root.title("GW2 arcdps File Selector")
-root.geometry("1000x800")
+root.configure(bg="#333333")  # Match the Forest theme's dark background color
 
-# Elite Insights selector at top
-ei_selector_frame = ttk.Frame(root)
-ei_selector_frame.pack(fill="x", pady=5)
+# Load the Forest theme from the "themes" directory
+themes_dir = os.path.join(os.getcwd(), "themes")
+forest_dark_path = os.path.join(themes_dir, "forest-dark.tcl")
+forest_light_path = os.path.join(themes_dir, "forest-light.tcl")
 
-elite_button = ttk.Button(ei_selector_frame, text="Set Elite Insights Folder", command=choose_elite_insights_path)
+# Check if the theme files exist
+if os.path.exists(forest_dark_path):
+    root.tk.call("source", forest_dark_path)
+if os.path.exists(forest_light_path):
+    root.tk.call("source", forest_light_path)
+
+# Apply the Forest theme (choose "forest-dark" or "forest-light")
+ttk.Style().theme_use("forest-dark")  # Use "forest-dark" for dark mode or "forest-light" for light mode
+
+# Make the window resizable
+root.rowconfigure(1, weight=1)  # Allow the main content area to expand
+root.columnconfigure(0, weight=1)  # Allow horizontal expansion
+
+# Group all top buttons and labels into a single frame
+top_buttons_frame = ttk.LabelFrame(root, text="Configuration", padding=10)
+top_buttons_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
+
+# Create a row for Elite Insights button and label
+elite_frame = ttk.Frame(top_buttons_frame)
+elite_frame.pack(fill="x", pady=5)
+
+elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=choose_elite_insights_path)
 elite_button.pack(side="left", padx=5)
 
-ei_path_label = ttk.Label(ei_selector_frame, text=f"Elite Insights Folder: {config.get('elite_insights_path', '')}")
+ei_path_label = ttk.Label(elite_frame, text=f"Elite Insights Folder: {config.get('elite_insights_path', '')}")
 ei_path_label.pack(side="left", padx=10)
 
-# Top Stats Parser selector below Elite Insights
-ts_selector_frame = ttk.Frame(root)
-ts_selector_frame.pack(fill="x", pady=5)
+# Create a row for Top Stats Parser button and label
+top_stats_frame = ttk.Frame(top_buttons_frame)
+top_stats_frame.pack(fill="x", pady=5)
 
-top_stats_button = ttk.Button(ts_selector_frame, text="Set Top Stats Parser Folder", command=choose_top_stats_path)
+top_stats_button = ttk.Button(top_stats_frame, text="Set Top Stats Parser Folder", command=choose_top_stats_path)
 top_stats_button.pack(side="left", padx=5)
 
-ts_path_label = ttk.Label(ts_selector_frame, text=f"Top Stats Parser Folder: {config.get('top_stats_path', '')}")
+ts_path_label = ttk.Label(top_stats_frame, text=f"Top Stats Parser Folder: {config.get('top_stats_path', '')}")
 ts_path_label.pack(side="left", padx=10)
 
-# Folder selector
-top_frame = ttk.Frame(root)
-top_frame.pack(fill="x")
+# Create a row for Folder Selector button and label
+folder_frame = ttk.Frame(top_buttons_frame)
+folder_frame.pack(fill="x", pady=5)
 
-select_folder_button = ttk.Button(top_frame, text="Select Folder", command=choose_root_folder)
-select_folder_button.pack(side="left", padx=5, pady=5)
+select_folder_button = ttk.Button(folder_frame, text="Select Folder", command=choose_root_folder)
+select_folder_button.pack(side="left", padx=5)
 
-selected_path_label = ttk.Label(top_frame, text=f"Current Folder: {config.get('last_path', '')}")
+selected_path_label = ttk.Label(folder_frame, text=f"Current Folder: {config.get('last_path', '')}")
 selected_path_label.pack(side="left", padx=10)
 
-# Main layout
-main_frame = ttk.Frame(root)
-main_frame.pack(fill="both", expand=True)
+# Main layout section
+main_frame = ttk.LabelFrame(root, text="File Selection", padding=10)
+main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 main_frame.rowconfigure(0, weight=1)
 main_frame.columnconfigure(0, weight=1)
 
-# Treeview container frame using grid
+# Treeview container frame
 tree_frame = ttk.Frame(main_frame)
 tree_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
@@ -172,29 +194,30 @@ tree_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=tree_scroll.set)
 tree_scroll.grid(row=0, column=1, sticky="ns")
 
-# Filter by date section under tree
-filter_frame = ttk.Frame(root)
-filter_frame.pack(fill="x", pady=5)
+# Filter by date section
+filter_frame = ttk.LabelFrame(root, text="Filter by Date", padding=10)
+filter_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
 
 date_label = ttk.Label(filter_frame, text="Select all logs modified after (YYYY-MM-DD HH:MM):")
 date_label.pack(side="left", padx=5)
 
+# Use ttk.Entry with the Forest theme
 date_entry = ttk.Entry(filter_frame, width=20)
-date_entry.pack(side="left")
+date_entry.pack(side="left", padx=5)
 date_entry.insert(0, datetime.now().strftime("%Y-%m-%d %H:%M"))
 
 select_after_button = ttk.Button(filter_frame, text="Select Recent Logs", command=select_files_after_date)
-select_after_button.pack(side="left", padx=10)
+select_after_button.pack(side="left", padx=5)
 
-# Listbox for selected files
-selected_frame = ttk.Frame(main_frame)
+# Selected files section
+selected_frame = ttk.LabelFrame(main_frame, text="Selected Files", padding=10)
 selected_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
 
-selected_label = ttk.Label(selected_frame, text="Selected .zevtc Files")
-selected_label.pack(anchor="nw")
-
-selected_listbox = tk.Listbox(selected_frame, width=60, selectmode="extended")
-selected_listbox.pack(fill="y", expand=True)
+# Use ttk.Treeview for the selected files list
+selected_tree = ttk.Treeview(selected_frame, columns=("File"), show="headings", height=20)
+selected_tree.heading("File", text="File")
+selected_tree.column("File", anchor="w", width=300)
+selected_tree.pack(fill="y", expand=True, pady=5)
 
 # Frame for count label and unselect button
 count_frame = ttk.Frame(selected_frame)
@@ -217,11 +240,11 @@ if root_path:
 last_selected = None
 
 def update_selected_list():
-    selected_listbox.delete(0, tk.END)
+    selected_tree.delete(*selected_tree.get_children())
     count = 0
     for path in sorted(checked_items.keys()):
         display_name = os.path.relpath(path, root_path) if root_path else os.path.basename(path)
-        selected_listbox.insert(tk.END, display_name)
+        selected_tree.insert("", tk.END, values=(display_name,))
         count += 1
 
     count_label.config(text=f"{count} file(s) selected")
@@ -308,9 +331,9 @@ def on_tree_click(event):
     update_selected_list()
 
 def on_listbox_double_click(event):
-    selection = selected_listbox.curselection()
+    selection = selected_tree.selection()
     if selection:
-        selected_name = selected_listbox.get(selection[0])
+        selected_name = selected_tree.item(selection[0], "values")[0]
         full_path = os.path.join(root_path, selected_name)
         if full_path in checked_items:
             del checked_items[full_path]
@@ -352,7 +375,7 @@ if os.path.exists(root_path):
     populate_tree('', root_path)
 
 tree.bind("<Button-1>", on_tree_click)
-selected_listbox.bind("<Double-Button-1>", on_listbox_double_click)
+selected_tree.bind("<Double-Button-1>", on_listbox_double_click)
 
 def generate_aggregate():
     if not checked_items:
@@ -366,13 +389,17 @@ def generate_aggregate():
 
     # Create a popup window for progress
     progress_popup = Toplevel(root)
-    progress_popup.title("")  # Remove the title text
-    progress_popup.geometry("600x400")  # Adjust the size to look like a terminal
-    progress_popup.resizable(False, False)  # Disable resizing
+    progress_popup.title("Processing Files")
+    progress_popup.geometry("600x400")
+    progress_popup.resizable(False, False)
 
-    # Terminal-like output using a Text widget
-    terminal_output = tk.Text(progress_popup, height=25, width=80, state="disabled", bg="black", fg="white", font=("Courier", 10), borderwidth=0)
-    terminal_output.pack(fill="both", expand=True)  # Fill the entire popup window
+    # Create a styled frame for the terminal output
+    terminal_frame = ttk.Frame(progress_popup, padding=10)
+    terminal_frame.pack(fill="both", expand=True)
+
+    # Use a tk.Text widget for terminal-like output
+    terminal_output = tk.Text(terminal_frame, height=25, width=80, state="disabled", bg="#3a3a3a", fg="#ffffff", font=("Courier", 10), borderwidth=0)
+    terminal_output.pack(fill="both", expand=True)
 
     def update_terminal_output(message):
         terminal_output.config(state="normal")
@@ -449,7 +476,7 @@ def generate_aggregate():
                 try:
                     for file in os.listdir(temp_dir):
                         file_path = os.path.join(temp_dir, file)
-                        if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
+                        if os.path.isfile(file_path) and file.lower().ends_with(".json.gz"):
                             # Extract the .json.gz file
                             extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
                             with gzip.open(file_path, "rb") as gz_file:
@@ -515,8 +542,8 @@ def edit_conf_file(template_path, output_path, temp_dir):
     except Exception as e:
         print(f"Error editing .conf file: {e}")
 
-# Add "Generate Aggregate" button at the bottom right
-generate_button = ttk.Button(root, text="Generate Aggregate", command=generate_aggregate)
-generate_button.pack(side="bottom", anchor="se", padx=10, pady=10)
+# Add "Generate Aggregate" and "Select Recent Logs" buttons at the bottom
+generate_button = ttk.Button(root, text="Generate Aggregate", command=generate_aggregate, style="Accent.TButton")
+generate_button.grid(row=3, column=0, sticky="e", padx=10, pady=10)  # Align to the right
 
 root.mainloop()
