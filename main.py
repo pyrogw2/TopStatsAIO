@@ -47,9 +47,15 @@ def get_default_time():
 
 # Choose root folder
 def choose_root_folder():
-    """Select a folder and populate the file tree."""
-    folder = filedialog.askdirectory(title="Select Root Folder")
+    """Select a folder and populate the file tree. Open the folder if it exists."""
+    initial_dir = config.get("last_path", "") if os.path.exists(config.get("last_path", "")) else ""
+    folder = filedialog.askdirectory(title="Select Root Folder", initialdir=initial_dir)
     if folder:
+        if os.path.exists(folder):
+            # Open the folder in the file explorer
+            os.startfile(folder)
+
+        # Clear the tree and populate it with the selected folder
         for i in tree.get_children():
             tree.delete(i)
         checked_items.clear()
@@ -63,19 +69,19 @@ def choose_root_folder():
 
 # Choose Elite Insights folder
 def choose_elite_insights_path():
-    path = filedialog.askdirectory(title="Select Elite Insights Folder")
+    initial_dir = config.get("elite_insights_path", "") if os.path.exists(config.get("elite_insights_path", "")) else ""
+    path = filedialog.askdirectory(title="Select Elite Insights Folder", initialdir=initial_dir)
     if path:
         config["elite_insights_path"] = path
         save_config()
-        # ei_path_label.config(text=f"Elite Insights Folder: {path}")
 
 # Choose Top Stats Parser folder
 def choose_top_stats_path():
-    path = filedialog.askdirectory(title="Select Top Stats Parser Folder")
+    initial_dir = config.get("top_stats_path", "") if os.path.exists(config.get("top_stats_path", "")) else ""
+    path = filedialog.askdirectory(title="Select Top Stats Parser Folder", initialdir=initial_dir)
     if path:
         config["top_stats_path"] = path
         save_config()
-        # ts_path_label.config(text=f"Top Stats Parser Folder: {path}")
 
 # Select all files modified after a certain date
 def select_files_after_date():
@@ -765,21 +771,20 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, token_ent
     top_stats_path = top_stats_entry.get()
     token = token_entry.get()
 
+    # Validate Elite Insights Path
     if not elite_path or not os.path.exists(elite_path):
         messagebox.showerror("Invalid Path", "Please provide a valid Elite Insights Path.")
         return
 
+    # Validate Top Stats Parser Path
     if not top_stats_path or not os.path.exists(top_stats_path):
         messagebox.showerror("Invalid Path", "Please provide a valid Top Stats Parser Path.")
         return
 
-    if not token:
-        messagebox.showerror("Missing Token", "Please provide a valid DPSReportUserToken.")
-        return
-
+    # Save the configuration
     config["elite_insights_path"] = elite_path
     config["top_stats_path"] = top_stats_path
-    config["DPSReportUserToken"] = token
+    config["DPSReportUserToken"] = token  # Save the token even if it's empty
     config["default_hour"] = int(hour_entry.get())
     config["default_minute"] = int(minute_entry.get())
     save_config()
@@ -795,19 +800,19 @@ def validate_config():
     """Validate the required configuration values."""
     missing_fields = []
 
+    # Check Elite Insights Path
     if not config.get("elite_insights_path"):
         missing_fields.append("Elite Insights Path")
     elif not os.path.exists(config["elite_insights_path"]):
         missing_fields.append("Elite Insights Path (Invalid Path)")
 
+    # Check Top Stats Parser Path
     if not config.get("top_stats_path"):
         missing_fields.append("Top Stats Parser Path")
     elif not os.path.exists(config["top_stats_path"]):
         missing_fields.append("Top Stats Parser Path (Invalid Path)")
 
-    if not config.get("DPSReportUserToken"):
-        missing_fields.append("DPSReportUserToken")
-
+    # Show error message if any fields are missing or invalid
     if missing_fields:
         messagebox.showerror(
             "Configuration Error",
