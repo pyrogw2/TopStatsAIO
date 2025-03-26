@@ -415,7 +415,7 @@ def generate_aggregate():
     terminal_frame.pack(fill="both", expand=True)
 
     # Use a tk.Text widget for terminal-like output
-    terminal_output = tk.Text(terminal_frame, height=25, width=80, state="disabled", bg="#3a3a3a", fg="#ffffff", font=("Courier", 10), borderwidth=0)
+    terminal_output = tk.Text(terminal_frame, height=20, width=80, state="disabled", bg="#3a3a3a", fg="#ffffff", font=("Courier", 10), borderwidth=0)
     terminal_output.pack(fill="both", expand=True)
 
     def update_terminal_output(message):
@@ -424,17 +424,33 @@ def generate_aggregate():
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
 
+    # Define a custom style for the green button
+    style = ttk.Style()
+    style.configure("Green.TButton", background="#28a745", foreground="white", font=("Arial", 10, "bold"))
+    style.map(
+        "Green.TButton",
+        background=[("active", "#218838"), ("disabled", "#6c757d")],  # Darker green when active, gray when disabled
+        foreground=[("disabled", "#ffffff")],
+    )
+
     # Create a frame for the button at the bottom of the popup
     button_frame = ttk.Frame(progress_popup, padding=10)
     button_frame.pack(side="bottom", fill="x")
 
     # Add the "Open Folder" button (initially disabled)
     generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
-    open_folder_button = ttk.Button(button_frame, text="Open Folder", state="disabled", command=lambda: os.startfile(generated_agg_folder))
+    open_folder_button = ttk.Button(
+        button_frame,
+        text="Open Folder",
+        state="disabled",
+        style="TButton",  # Default style
+        command=lambda: os.startfile(generated_agg_folder),
+    )
     open_folder_button.pack(pady=5)
 
     def enable_open_folder_button():
-        open_folder_button.config(state="normal")  # Enable the button
+        update_terminal_output("\n**Process completed successfully!**")
+        open_folder_button.config(state="normal", style="Green.TButton")  # Enable the button and apply the green style
 
     def process_files():
         processing_complete = threading.Event()  # Event to signal when processing is complete
@@ -624,6 +640,9 @@ def generate_aggregate():
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
+
+    progress_popup.update_idletasks()  # Force the window to update its layout
+    progress_popup.geometry(f"{progress_popup.winfo_width()}x{progress_popup.winfo_height()}")
 
 def edit_conf_file(template_path, output_path, temp_dir):
     """Edit the Elite Insights configuration file."""
