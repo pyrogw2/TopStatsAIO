@@ -401,6 +401,9 @@ def generate_aggregate():
                     except Exception as e:
                         update_terminal_output(f"Error copying file {full_path}: {e}")
 
+                # Add a separator after copying files
+                update_terminal_output("\n" + "-" * 50 + "\n")
+
                 # Locate the Elite Insights executable
                 ei_exec = None
                 elite_insights_path = config.get("elite_insights_path", "")
@@ -442,7 +445,10 @@ def generate_aggregate():
                     processing_complete.set()  # Signal completion
                     return
 
-                # Extract .json.gz files to .json in a new subfolder
+                # Add a separator after processing with Elite Insights
+                update_terminal_output("\n" + "-" * 50 + "\n")
+
+                # Move .json.gz files to the ProcessedLogs folder
                 processed_folder = os.path.join(temp_dir, "ProcessedLogs")
                 os.makedirs(processed_folder, exist_ok=True)
 
@@ -450,21 +456,23 @@ def generate_aggregate():
                 import stat
                 os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
+                # Move .json.gz files to the ProcessedLogs folder
                 try:
                     for file in os.listdir(temp_dir):
                         file_path = os.path.join(temp_dir, file)
                         if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
-                            # Extract the .json.gz file
-                            extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
-                            with gzip.open(file_path, "rb") as gz_file:
-                                with open(extracted_file_path, "wb") as json_file:
-                                    shutil.copyfileobj(gz_file, json_file)
-                            update_terminal_output(f"Extracted: {file} -> {extracted_file_path}")
-                    update_terminal_output(f"All .json.gz files have been extracted to: {processed_folder}")
+                            # Move the .json.gz file to the ProcessedLogs folder
+                            destination_path = os.path.join(processed_folder, file)
+                            shutil.move(file_path, destination_path)
+                            update_terminal_output(f"Moved: {file} -> {destination_path}")
+                    update_terminal_output(f"All .json.gz files have been moved to: {processed_folder}")
                 except Exception as e:
-                    update_terminal_output(f"Error extracting .json.gz files: {e}")
+                    update_terminal_output(f"Error moving .json.gz files: {e}")
                     processing_complete.set()  # Signal completion
                     return
+
+                # Add a separator after moving .json.gz files
+                update_terminal_output("\n" + "-" * 50 + "\n")
 
                 # Signal that processing is complete
                 processing_complete.set()
