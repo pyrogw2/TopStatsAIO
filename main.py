@@ -395,6 +395,9 @@ tree.bind("<Button-1>", on_tree_click)
 selected_tree.bind("<Double-Button-1>", on_listbox_double_click)
 
 def generate_aggregate():
+    if not validate_config():
+        return  # Exit if the configuration is invalid
+
     if not checked_items:
         # Show an error popup if no files are selected
         messagebox.showerror("No Files Selected", "Please select at least one file to generate the aggregate.")
@@ -662,16 +665,26 @@ def edit_conf_file(template_path, output_path, temp_dir):
     except Exception as e:
         print(f"Error editing .conf file: {e}")
 
+config_window_instance = None  # Global variable to track the config window
+
 def open_config_window():
     """Open the configuration popup window."""
-    config_window = Toplevel(root)
-    config_window.title("Configuration")
-    config_window.geometry("500x400")
-    config_window.resizable(False, False)
-    config_window.configure(bg="#333333")  # Match the Forest theme's dark background color
+    global config_window_instance
+
+    if config_window_instance and tk.Toplevel.winfo_exists(config_window_instance):
+        # If the window is already open, bring it to the front
+        config_window_instance.lift()
+        return
+
+    # Create the configuration window
+    config_window_instance = Toplevel(root)
+    config_window_instance.title("Configuration")
+    config_window_instance.geometry("500x400")
+    config_window_instance.resizable(False, False)
+    config_window_instance.configure(bg="#333333")  # Match the Forest theme's dark background color
 
     # Configuration frame
-    top_buttons_frame = ttk.LabelFrame(config_window, text="Configuration", padding=10)
+    top_buttons_frame = ttk.LabelFrame(config_window_instance, text="Configuration", padding=10)
     top_buttons_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
     # Elite Insights Folder
@@ -726,9 +739,18 @@ def open_config_window():
     minute_entry.pack(side="left", padx=5)
 
     # Save Button
-    save_button = ttk.Button(config_window, text="Save", command=lambda: save_and_close_config(
-        config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry))
+    save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
+        config_window_instance, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry))
     save_button.pack(anchor="e", padx=10, pady=10)
+
+    # Handle window close event
+    def on_close():
+        global config_window_instance
+        if config_window_instance:
+            config_window_instance.destroy()  # Destroy the window first
+            config_window_instance = None  # Reset the instance when the window is closed
+
+    config_window_instance.protocol("WM_DELETE_WINDOW", on_close)
 
 def browse_folder(entry_widget):
     """Open a folder dialog and set the selected path in the entry widget."""
@@ -739,9 +761,25 @@ def browse_folder(entry_widget):
 
 def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry):
     """Save the changes and close the configuration popup."""
-    config["elite_insights_path"] = elite_entry.get()
-    config["top_stats_path"] = top_stats_entry.get()
-    config["DPSReportUserToken"] = token_entry.get()
+    elite_path = elite_entry.get()
+    top_stats_path = top_stats_entry.get()
+    token = token_entry.get()
+
+    if not elite_path or not os.path.exists(elite_path):
+        messagebox.showerror("Invalid Path", "Please provide a valid Elite Insights Path.")
+        return
+
+    if not top_stats_path or not os.path.exists(top_stats_path):
+        messagebox.showerror("Invalid Path", "Please provide a valid Top Stats Parser Path.")
+        return
+
+    if not token:
+        messagebox.showerror("Missing Token", "Please provide a valid DPSReportUserToken.")
+        return
+
+    config["elite_insights_path"] = elite_path
+    config["top_stats_path"] = top_stats_path
+    config["DPSReportUserToken"] = token
     config["default_hour"] = int(hour_entry.get())
     config["default_minute"] = int(minute_entry.get())
     save_config()
@@ -752,6 +790,32 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, token_ent
     date_entry.insert(0, new_default_time)
 
     config_window.destroy()  # Close the configuration popup
+
+def validate_config():
+    """Validate the required configuration values."""
+    missing_fields = []
+
+    if not config.get("elite_insights_path"):
+        missing_fields.append("Elite Insights Path")
+    elif not os.path.exists(config["elite_insights_path"]):
+        missing_fields.append("Elite Insights Path (Invalid Path)")
+
+    if not config.get("top_stats_path"):
+        missing_fields.append("Top Stats Parser Path")
+    elif not os.path.exists(config["top_stats_path"]):
+        missing_fields.append("Top Stats Parser Path (Invalid Path)")
+
+    if not config.get("DPSReportUserToken"):
+        missing_fields.append("DPSReportUserToken")
+
+    if missing_fields:
+        messagebox.showerror(
+            "Configuration Error",
+            f"The following configuration fields are missing or invalid:\n\n- " + "\n- ".join(missing_fields)
+        )
+        return False
+
+    return True
 
 # Add "Generate Aggregate" and "Select Recent Logs" buttons at the bottom
 generate_button = ttk.Button(root, text="Generate Aggregate", command=generate_aggregate, style="Accent.TButton")
