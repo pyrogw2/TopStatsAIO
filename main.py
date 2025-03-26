@@ -1,4 +1,5 @@
 import os
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog
 from datetime import datetime
@@ -487,7 +488,7 @@ def generate_aggregate():
                 # Add a separator after processing with Elite Insights
                 update_terminal_output("\n" + "-" * 50 + "\n")
 
-                # Move .json.gz files to the ProcessedLogs folder
+                # Ensure the ProcessedLogs folder exists
                 processed_folder = os.path.join(temp_dir, "ProcessedLogs")
                 os.makedirs(processed_folder, exist_ok=True)
 
@@ -510,28 +511,7 @@ def generate_aggregate():
                     processing_complete.set()  # Signal completion
                     return
 
-                # Add a separator after moving .json.gz files
-                update_terminal_output("\n" + "-" * 50 + "\n")
-
-                # Move the output .json file to the GeneratedAgg folder
-                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
-                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
-
-                # Find the .json file in the processed folder
-                for file in os.listdir(processed_folder):
-                    if file.lower().endswith(".json"):
-                        source_path = os.path.join(processed_folder, file)
-                        destination_path = os.path.join(generated_agg_folder, file)
-                        shutil.move(source_path, destination_path)
-                        update_terminal_output("\n" + "-" * 50 + "\n")
-                        update_terminal_output(f"Moved output file to: {destination_path}")
-                        break
-                else:
-                    update_terminal_output("No .json output file found in the processed folder.")
-
                 # Signal that processing is complete
-                update_terminal_output("\n**Process completed successfully! Opening the folder with generated aggregate logs...**")
-                os.startfile(generated_agg_folder)  # Open the GeneratedAgg folder
                 processing_complete.set()
             except Exception as e:
                 update_terminal_output(f"Unexpected error: {e}")
@@ -576,6 +556,23 @@ def generate_aggregate():
                 else:
                     update_terminal_output("No .json output file found in the processed folder.")
                     return  # Exit early if no .json file is found
+                
+                # Add a separator after moving .json.gz files
+                update_terminal_output("\n" + "-" * 50 + "\n")
+
+                # Move the output .json file to the GeneratedAgg folder
+                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+                # Delete the temporary folder
+                try:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)  # Remove the temporary folder
+                        update_terminal_output(f"Temporary folder deleted: {temp_dir}")
+                    else:
+                        update_terminal_output(f"Temporary folder not found: {temp_dir}")
+                except Exception as e:
+                    update_terminal_output(f"Error deleting temporary folder: {e}")
 
                 # Notify the user and open the GeneratedAgg folder
                 update_terminal_output("\n**Process completed successfully! Opening the folder with generated aggregate logs...**")
