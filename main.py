@@ -186,9 +186,6 @@ date_entry.insert(0, datetime.now().strftime("%Y-%m-%d %H:%M"))
 select_after_button = ttk.Button(filter_frame, text="Select Recent Logs", command=select_files_after_date)
 select_after_button.pack(side="left", padx=10)
 
-unselect_button = ttk.Button(filter_frame, text="Unselect All", command=unselect_all)
-unselect_button.pack(side="left", padx=10)
-
 # Listbox for selected files
 selected_frame = ttk.Frame(main_frame)
 selected_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
@@ -199,8 +196,15 @@ selected_label.pack(anchor="nw")
 selected_listbox = tk.Listbox(selected_frame, width=60, selectmode="extended")
 selected_listbox.pack(fill="y", expand=True)
 
-count_label = ttk.Label(selected_frame, text="0 file(s) selected")
-count_label.pack(anchor="nw", pady=(5, 0))
+# Frame for count label and unselect button
+count_frame = ttk.Frame(selected_frame)
+count_frame.pack(fill="x", pady=(5, 0))
+
+count_label = ttk.Label(count_frame, text="0 file(s) selected")
+count_label.pack(side="left", anchor="w")
+
+unselect_button = ttk.Button(count_frame, text="Unselect All", command=unselect_all)
+unselect_button.pack(side="right", anchor="e")
 
 # Track selected files using checkboxes
 tree.tag_configure("selected", background="#ccffcc")
@@ -377,101 +381,121 @@ def generate_aggregate():
         terminal_output.config(state="disabled")
 
     def process_files():
-        # Copy files with progress
-        total_files = len(checked_items)
-        update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
-        for i, full_path in enumerate(checked_items.keys(), start=1):
+        processing_complete = threading.Event()  # Event to signal when processing is complete
+
+        def process_zevtc_files():
             try:
-                shutil.copy(full_path, temp_dir)
-                progress = int((i / total_files) * 50)  # ASCII progress bar length
-                progress_bar = "[" + "#" * progress + "-" * (50 - progress) + "]"
-                update_terminal_output(f"{progress_bar} {i}/{total_files} - Copied: {os.path.basename(full_path)}")
+                # Copy files with progress
+                total_files = len(checked_items)
+                update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
+                for i, full_path in enumerate(checked_items.keys(), start=1):
+                    try:
+                        shutil.copy(full_path, temp_dir)
+                        progress = int((i / total_files) * 50)  # ASCII progress bar length
+                        progress_bar = "[" + "#" * progress + "-" * (50 - progress) + "]"
+                        update_terminal_output(f"{progress_bar} {i}/{total_files} - Copied: {os.path.basename(full_path)}")
+                    except Exception as e:
+                        update_terminal_output(f"Error copying file {full_path}: {e}")
+
+                # Locate the Elite Insights executable
+                ei_exec = None
+                elite_insights_path = config.get("elite_insights_path", "")
+                if os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")):
+                    ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")
+                elif os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")):
+                    ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")
+                else:
+                    update_terminal_output("No valid Guild Wars 2 Elite Insights executable found.")
+                    processing_complete.set()  # Signal completion
+                    return
+
+                # Use the configuration template from the root of the project directory
+                template_conf_file = os.path.join(os.getcwd(), "EliteInsightsConfigTemplate.conf")
+                edited_conf_file = os.path.join(temp_dir, "EliteInsightConfig.conf")
+
+                if not os.path.exists(template_conf_file):
+                    update_terminal_output(f"Configuration template file not found: {template_conf_file}")
+                    processing_complete.set()  # Signal completion
+                    return
+
+                # Edit the .conf file to set OutLocation to the temporary folder
+                edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
+
+                # Process .zevtc files using Elite Insights
+                try:
+                    update_terminal_output("Processing .zevtc files with Elite Insights...")
+                    zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
+                    for i, file in enumerate(zevtc_files, start=1):
+                        file_path = os.path.join(temp_dir, file)
+                        command = [ei_exec, "-c", edited_conf_file, file_path]
+                        update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
+                        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        update_terminal_output(result.stdout.strip())
+                        if result.returncode != 0:
+                            update_terminal_output(f"Error: {result.stderr.strip()}")
+                except Exception as e:
+                    update_terminal_output(f"Error processing files with Elite Insights: {e}")
+                    processing_complete.set()  # Signal completion
+                    return
+
+                # Extract .json.gz files to .json in a new subfolder
+                processed_folder = os.path.join(temp_dir, "ProcessedLogs")
+                os.makedirs(processed_folder, exist_ok=True)
+
+                # Ensure the folder is writable
+                import stat
+                os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+
+                try:
+                    for file in os.listdir(temp_dir):
+                        file_path = os.path.join(temp_dir, file)
+                        if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
+                            # Extract the .json.gz file
+                            extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
+                            with gzip.open(file_path, "rb") as gz_file:
+                                with open(extracted_file_path, "wb") as json_file:
+                                    shutil.copyfileobj(gz_file, json_file)
+                            update_terminal_output(f"Extracted: {file} -> {extracted_file_path}")
+                    update_terminal_output(f"All .json.gz files have been extracted to: {processed_folder}")
+                except Exception as e:
+                    update_terminal_output(f"Error extracting .json.gz files: {e}")
+                    processing_complete.set()  # Signal completion
+                    return
+
+                # Signal that processing is complete
+                processing_complete.set()
             except Exception as e:
-                update_terminal_output(f"Error copying file {full_path}: {e}")
+                update_terminal_output(f"Unexpected error: {e}")
+                processing_complete.set()
 
-        # Locate the Elite Insights executable
-        ei_exec = None
-        elite_insights_path = config.get("elite_insights_path", "")
-        if os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")):
-            ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")
-        elif os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")):
-            ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")
-        else:
-            update_terminal_output("No valid Guild Wars 2 Elite Insights executable found.")
-            return
+        # Start the processing in a separate thread
+        threading.Thread(target=process_zevtc_files).start()
 
-        # Use the configuration template from the root of the project directory
-        template_conf_file = os.path.join(os.getcwd(), "EliteInsightsConfigTemplate.conf")
-        edited_conf_file = os.path.join(temp_dir, "EliteInsightConfig.conf")
+        # Wait for processing to complete before running the Python script
+        def wait_and_run_script():
+            processing_complete.wait()  # Wait for the event to be set
 
-        if not os.path.exists(template_conf_file):
-            update_terminal_output(f"Configuration template file not found: {template_conf_file}")
-            return
+            # Run the Python script
+            try:
+                python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
+                processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
 
-        # Edit the .conf file to set OutLocation to the temporary folder
-        edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
+                # Properly escape the paths by wrapping them in quotes
+                command = ["python", f'"{python_script}"', "-i", f'"{processed_folder_path}"']
+                update_terminal_output(f"Running Python script: {' '.join(command)}")
 
-        # Process .zevtc files using Elite Insights
-        try:
-            update_terminal_output("Processing .zevtc files with Elite Insights...")
-            zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
-            for i, file in enumerate(zevtc_files, start=1):
-                file_path = os.path.join(temp_dir, file)
-                command = [ei_exec, "-c", edited_conf_file, file_path]
-                update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
-                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                # Run the command
+                result = subprocess.run(" ".join(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
                 update_terminal_output(result.stdout.strip())
                 if result.returncode != 0:
                     update_terminal_output(f"Error: {result.stderr.strip()}")
-        except Exception as e:
-            update_terminal_output(f"Error processing files with Elite Insights: {e}")
-            return
+                    return
+                update_terminal_output("Python script completed successfully.")
+            except Exception as e:
+                update_terminal_output(f"Error running Python script: {e}")
 
-        # Extract .json.gz files to .json in a new subfolder
-        processed_folder = os.path.join(temp_dir, "ProcessedLogs")
-        os.makedirs(processed_folder, exist_ok=True)
-
-        # Ensure the folder is writable
-        import stat
-        os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-
-        try:
-            for file in os.listdir(temp_dir):
-                file_path = os.path.join(temp_dir, file)
-                if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
-                    # Extract the .json.gz file
-                    extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
-                    with gzip.open(file_path, "rb") as gz_file:
-                        with open(extracted_file_path, "wb") as json_file:
-                            shutil.copyfileobj(gz_file, json_file)
-                    update_terminal_output(f"Extracted: {file} -> {extracted_file_path}")
-            update_terminal_output(f"All .json.gz files have been extracted to: {processed_folder}")
-        except Exception as e:
-            update_terminal_output(f"Error extracting .json.gz files: {e}")
-            return
-
-        # Run the Python script
-        try:
-            python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
-            processed_folder_path = os.path.abspath(processed_folder)
-
-            # Properly escape the paths by wrapping them in quotes
-            command = ["python", f'"{python_script}"', "-i", f'"{processed_folder_path}"']
-            update_terminal_output(f"Running Python script: {' '.join(command)}")
-
-            # Run the command
-            result = subprocess.run(" ".join(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-            update_terminal_output(result.stdout.strip())
-            if result.returncode != 0:
-                update_terminal_output(f"Error: {result.stderr.strip()}")
-                return
-            update_terminal_output("Python script completed successfully.")
-        except Exception as e:
-            update_terminal_output(f"Error running Python script: {e}")
-            return
-
-        # Close the popup after completion
-        update_terminal_output("Processing complete!")
+        # Start the script execution in a separate thread
+        threading.Thread(target=wait_and_run_script).start()
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
