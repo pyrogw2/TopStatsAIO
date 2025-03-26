@@ -31,6 +31,7 @@ config = load_config()
 
 # Choose root folder
 def choose_root_folder():
+    """Select a folder and populate the file tree."""
     folder = filedialog.askdirectory(title="Select Root Folder")
     if folder:
         for i in tree.get_children():
@@ -134,38 +135,14 @@ ttk.Style().theme_use("forest-dark")  # Use "forest-dark" for dark mode or "fore
 root.rowconfigure(1, weight=1)  # Allow the main content area to expand
 root.columnconfigure(0, weight=1)  # Allow horizontal expansion
 
-# Group all top buttons and labels into a single frame
-top_buttons_frame = ttk.LabelFrame(root, text="Configuration", padding=10)
-top_buttons_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
+# Add "Select Folder" button at the top of the main window
+select_folder_frame = ttk.Frame(root, padding=10)
+select_folder_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
-# Create a row for Elite Insights button and label
-elite_frame = ttk.Frame(top_buttons_frame)
-elite_frame.pack(fill="x", pady=5)
-
-elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=choose_elite_insights_path)
-elite_button.pack(side="left", padx=5)
-
-ei_path_label = ttk.Label(elite_frame, text=f"Elite Insights Folder: {config.get('elite_insights_path', '')}")
-ei_path_label.pack(side="left", padx=10)
-
-# Create a row for Top Stats Parser button and label
-top_stats_frame = ttk.Frame(top_buttons_frame)
-top_stats_frame.pack(fill="x", pady=5)
-
-top_stats_button = ttk.Button(top_stats_frame, text="Set Top Stats Parser Folder", command=choose_top_stats_path)
-top_stats_button.pack(side="left", padx=5)
-
-ts_path_label = ttk.Label(top_stats_frame, text=f"Top Stats Parser Folder: {config.get('top_stats_path', '')}")
-ts_path_label.pack(side="left", padx=10)
-
-# Create a row for Folder Selector button and label
-folder_frame = ttk.Frame(top_buttons_frame)
-folder_frame.pack(fill="x", pady=5)
-
-select_folder_button = ttk.Button(folder_frame, text="Select Folder", command=choose_root_folder)
+select_folder_button = ttk.Button(select_folder_frame, text="Select Folder", command=choose_root_folder)
 select_folder_button.pack(side="left", padx=5)
 
-selected_path_label = ttk.Label(folder_frame, text=f"Current Folder: {config.get('last_path', '')}")
+selected_path_label = ttk.Label(select_folder_frame, text=f"Current Folder: {config.get('last_path', '')}")
 selected_path_label.pack(side="left", padx=10)
 
 # Main layout section
@@ -235,7 +212,7 @@ checked_items = {}
 root_path = config.get("last_path", "")
 
 if root_path:
-    selected_path_label.config(text=f"Current Folder: {root_path}")
+    print(f"Current Folder: {root_path}")  # Log the current folder instead
 
 last_selected = None
 
@@ -528,22 +505,93 @@ def generate_aggregate():
     threading.Thread(target=process_files).start()
 
 def edit_conf_file(template_path, output_path, temp_dir):
+    """Edit the Elite Insights configuration file."""
     try:
         with open(template_path, "r") as template_file:
             lines = template_file.readlines()
 
-        # Modify the OutLocation line
+        # Modify the OutLocation and DPSReportUserToken lines
         with open(output_path, "w") as output_file:
             for line in lines:
                 if line.startswith("OutLocation="):
                     output_file.write(f"OutLocation={temp_dir}\n")
+                elif line.startswith("DPSReportUserToken="):
+                    output_file.write(f"DPSReportUserToken={config.get('DPSReportUserToken', '')}\n")
                 else:
                     output_file.write(line)
     except Exception as e:
         print(f"Error editing .conf file: {e}")
 
+def open_config_window():
+    """Open the configuration popup window."""
+    config_window = Toplevel(root)
+    config_window.title("Configuration")
+    config_window.geometry("500x400")
+    config_window.resizable(False, False)
+    config_window.configure(bg="#333333")  # Match the Forest theme's dark background color
+
+    # Configuration frame
+    top_buttons_frame = ttk.LabelFrame(config_window, text="Configuration", padding=10)
+    top_buttons_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # Elite Insights Folder
+    elite_frame = ttk.Frame(top_buttons_frame)
+    elite_frame.pack(fill="x", pady=5)
+
+    elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=lambda: browse_folder(elite_entry))
+    elite_button.pack(side="left", padx=5)
+
+    elite_entry = ttk.Entry(elite_frame, width=50)
+    elite_entry.insert(0, config.get("elite_insights_path", ""))
+    elite_entry.pack(side="left", padx=10)
+
+    # Top Stats Parser Folder
+    top_stats_frame = ttk.Frame(top_buttons_frame)
+    top_stats_frame.pack(fill="x", pady=5)
+
+    top_stats_button = ttk.Button(top_stats_frame, text="Set Top Stats Parser Folder", command=lambda: browse_folder(top_stats_entry))
+    top_stats_button.pack(side="left", padx=5)
+
+    top_stats_entry = ttk.Entry(top_stats_frame, width=50)
+    top_stats_entry.insert(0, config.get("top_stats_path", ""))
+    top_stats_entry.pack(side="left", padx=10)
+
+    # DPSReportUserToken
+    token_frame = ttk.Frame(top_buttons_frame)
+    token_frame.pack(fill="x", pady=5)
+
+    token_label = ttk.Label(token_frame, text="DPSReportUserToken:")
+    token_label.pack(side="left", padx=5)
+
+    token_entry = ttk.Entry(token_frame, width=50)
+    token_entry.insert(0, config.get("DPSReportUserToken", ""))
+    token_entry.pack(side="left", padx=10)
+
+    # Save Button
+    save_button = ttk.Button(config_window, text="Save", command=lambda: save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry))
+    save_button.pack(anchor="e", padx=10, pady=10)
+
+def browse_folder(entry_widget):
+    """Open a folder dialog and set the selected path in the entry widget."""
+    folder = filedialog.askdirectory(title="Select Folder")
+    if folder:
+        entry_widget.delete(0, tk.END)
+        entry_widget.insert(0, folder)
+
+def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry):
+    """Save the changes and close the configuration popup."""
+    config["elite_insights_path"] = elite_entry.get()
+    config["top_stats_path"] = top_stats_entry.get()
+    config["DPSReportUserToken"] = token_entry.get()
+    save_config()
+    config_window.destroy()  # Close the configuration popup
+
 # Add "Generate Aggregate" and "Select Recent Logs" buttons at the bottom
 generate_button = ttk.Button(root, text="Generate Aggregate", command=generate_aggregate, style="Accent.TButton")
 generate_button.grid(row=3, column=0, sticky="e", padx=10, pady=10)  # Align to the right
+
+# Add "Config" button at the bottom-left
+config_button = ttk.Button(root, text="Config", command=open_config_window)
+config_button.grid(row=3, column=0, sticky="w", padx=10, pady=10)
 
 root.mainloop()
