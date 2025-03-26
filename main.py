@@ -117,6 +117,19 @@ root = tk.Tk()
 root.title("GW2 arcdps File Selector")
 root.configure(bg="#333333")  # Match the Forest theme's dark background color
 
+# Set the application icon for both the window and the taskbar
+ico_path = os.path.join(os.getcwd(), "top-stats-aio.ico")
+png_path = os.path.join(os.getcwd(), "top-stats-aio.png")
+
+# Use iconbitmap for the window icon
+if os.path.exists(ico_path):
+    root.iconbitmap(ico_path)
+
+# Use iconphoto for the taskbar icon
+if os.path.exists(png_path):
+    icon_image = tk.PhotoImage(file=png_path)
+    root.iconphoto(True, icon_image)
+
 # Load the Forest theme from the "themes" directory
 themes_dir = os.path.join(os.getcwd(), "themes")
 forest_dark_path = os.path.join(themes_dir, "forest-dark.tcl")
@@ -379,20 +392,49 @@ def generate_aggregate():
     terminal_output.pack(fill="both", expand=True)
 
     def update_terminal_output(message):
+        if not terminal_output.winfo_exists():
+            return  # Avoid updating if the widget no longer exists
         terminal_output.config(state="normal")
         terminal_output.insert(tk.END, message + "\n")
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
 
-    def process_files():
-        processing_complete = threading.Event()  # Event to signal when processing is complete
+    # Events to signal processing and cancellation
+    cancel_event = threading.Event()
 
+    def cleanup_temp_dir():
+        """Cancel threads, delete the temporary folder, and close the popup."""
+        cancel_event.set()  # Signal cancellation to threads
+        try:
+            # Retry deleting the temporary folder if files are locked
+            for _ in range(5):  # Retry up to 5 times
+                try:
+                    shutil.rmtree(temp_dir)  # Delete the temporary folder
+                    print(f"Temporary folder deleted: {temp_dir}")
+                    break
+                except Exception as e:
+                    print(f"Error deleting temporary folder: {e}")
+                    threading.Event().wait(1)  # Wait 1 second before retrying
+        except Exception as e:
+            print(f"Unexpected error during cleanup: {e}")
+        finally:
+            if progress_popup.winfo_exists():
+                progress_popup.destroy()  # Close the popup window
+
+    # Bind the close event of the popup to cleanup_temp_dir
+    progress_popup.protocol("WM_DELETE_WINDOW", cleanup_temp_dir)
+
+    def process_files():
         def process_zevtc_files():
             try:
                 # Copy files with progress
                 total_files = len(checked_items)
                 update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
                 for i, full_path in enumerate(checked_items.keys(), start=1):
+                    if cancel_event.is_set():
+                        update_terminal_output("Processing canceled.")
+                        return  # Exit the thread immediately
+
                     try:
                         shutil.copy(full_path, temp_dir)
                         progress = int((i / total_files) * 50)  # ASCII progress bar length
@@ -410,8 +452,7 @@ def generate_aggregate():
                     ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")
                 else:
                     update_terminal_output("No valid Guild Wars 2 Elite Insights executable found.")
-                    processing_complete.set()  # Signal completion
-                    return
+                    return  # Exit the thread immediately
 
                 # Use the configuration template from the root of the project directory
                 template_conf_file = os.path.join(os.getcwd(), "EliteInsightsConfigTemplate.conf")
@@ -419,8 +460,7 @@ def generate_aggregate():
 
                 if not os.path.exists(template_conf_file):
                     update_terminal_output(f"Configuration template file not found: {template_conf_file}")
-                    processing_complete.set()  # Signal completion
-                    return
+                    return  # Exit the thread immediately
 
                 # Edit the .conf file to set OutLocation to the temporary folder
                 edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
@@ -430,6 +470,10 @@ def generate_aggregate():
                     update_terminal_output("Processing .zevtc files with Elite Insights...")
                     zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
                     for i, file in enumerate(zevtc_files, start=1):
+                        if cancel_event.is_set():
+                            update_terminal_output("Processing canceled.")
+                            return  # Exit the thread immediately
+
                         file_path = os.path.join(temp_dir, file)
                         command = [ei_exec, "-c", edited_conf_file, file_path]
                         update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
@@ -439,67 +483,13 @@ def generate_aggregate():
                             update_terminal_output(f"Error: {result.stderr.strip()}")
                 except Exception as e:
                     update_terminal_output(f"Error processing files with Elite Insights: {e}")
-                    processing_complete.set()  # Signal completion
-                    return
+                    return  # Exit the thread immediately
 
-                # Extract .json.gz files to .json in a new subfolder
-                processed_folder = os.path.join(temp_dir, "ProcessedLogs")
-                os.makedirs(processed_folder, exist_ok=True)
-
-                # Ensure the folder is writable
-                import stat
-                os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-
-                try:
-                    for file in os.listdir(temp_dir):
-                        file_path = os.path.join(temp_dir, file)
-                        if os.path.isfile(file_path) and file.lower().ends_with(".json.gz"):
-                            # Extract the .json.gz file
-                            extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
-                            with gzip.open(file_path, "rb") as gz_file:
-                                with open(extracted_file_path, "wb") as json_file:
-                                    shutil.copyfileobj(gz_file, json_file)
-                            update_terminal_output(f"Extracted: {file} -> {extracted_file_path}")
-                    update_terminal_output(f"All .json.gz files have been extracted to: {processed_folder}")
-                except Exception as e:
-                    update_terminal_output(f"Error extracting .json.gz files: {e}")
-                    processing_complete.set()  # Signal completion
-                    return
-
-                # Signal that processing is complete
-                processing_complete.set()
             except Exception as e:
                 update_terminal_output(f"Unexpected error: {e}")
-                processing_complete.set()
 
         # Start the processing in a separate thread
         threading.Thread(target=process_zevtc_files).start()
-
-        # Wait for processing to complete before running the Python script
-        def wait_and_run_script():
-            processing_complete.wait()  # Wait for the event to be set
-
-            # Run the Python script
-            try:
-                python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
-                processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
-
-                # Properly escape the paths by wrapping them in quotes
-                command = ["python", f'"{python_script}"', "-i", f'"{processed_folder_path}"']
-                update_terminal_output(f"Running Python script: {' '.join(command)}")
-
-                # Run the command
-                result = subprocess.run(" ".join(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                update_terminal_output(result.stdout.strip())
-                if result.returncode != 0:
-                    update_terminal_output(f"Error: {result.stderr.strip()}")
-                    return
-                update_terminal_output("Python script completed successfully.")
-            except Exception as e:
-                update_terminal_output(f"Error running Python script: {e}")
-
-        # Start the script execution in a separate thread
-        threading.Thread(target=wait_and_run_script).start()
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
