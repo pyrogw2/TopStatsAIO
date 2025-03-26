@@ -47,14 +47,10 @@ def get_default_time():
 
 # Choose root folder
 def choose_root_folder():
-    """Select a folder and populate the file tree. Open the folder if it exists."""
+    """Select a folder and populate the file tree."""
     initial_dir = config.get("last_path", "") if os.path.exists(config.get("last_path", "")) else ""
     folder = filedialog.askdirectory(title="Select Root Folder", initialdir=initial_dir)
     if folder:
-        if os.path.exists(folder):
-            # Open the folder in the file explorer
-            os.startfile(folder)
-
         # Clear the tree and populate it with the selected folder
         for i in tree.get_children():
             tree.delete(i)
