@@ -67,7 +67,7 @@ def choose_elite_insights_path():
     if path:
         config["elite_insights_path"] = path
         save_config()
-        ei_path_label.config(text=f"Elite Insights Folder: {path}")
+        # ei_path_label.config(text=f"Elite Insights Folder: {path}")
 
 # Choose Top Stats Parser folder
 def choose_top_stats_path():
@@ -75,7 +75,7 @@ def choose_top_stats_path():
     if path:
         config["top_stats_path"] = path
         save_config()
-        ts_path_label.config(text=f"Top Stats Parser Folder: {path}")
+        # ts_path_label.config(text=f"Top Stats Parser Folder: {path}")
 
 # Select all files modified after a certain date
 def select_files_after_date():
@@ -407,7 +407,7 @@ def generate_aggregate():
     # Create a popup window for progress
     progress_popup = Toplevel(root)
     progress_popup.title("Processing Files")
-    progress_popup.geometry("600x400")
+    progress_popup.geometry("600x450")
     progress_popup.resizable(False, False)
 
     # Create a styled frame for the terminal output
@@ -423,6 +423,18 @@ def generate_aggregate():
         terminal_output.insert(tk.END, message + "\n")
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
+
+    # Create a frame for the button at the bottom of the popup
+    button_frame = ttk.Frame(progress_popup, padding=10)
+    button_frame.pack(side="bottom", fill="x")
+
+    # Add the "Open Folder" button (initially disabled)
+    generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+    open_folder_button = ttk.Button(button_frame, text="Open Folder", state="disabled", command=lambda: os.startfile(generated_agg_folder))
+    open_folder_button.pack(pady=5)
+
+    def enable_open_folder_button():
+        open_folder_button.config(state="normal")  # Enable the button
 
     def process_files():
         processing_complete = threading.Event()  # Event to signal when processing is complete
@@ -476,7 +488,13 @@ def generate_aggregate():
                         file_path = os.path.join(temp_dir, file)
                         command = [ei_exec, "-c", edited_conf_file, file_path]
                         update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
-                        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        result = subprocess.run(
+                            command,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+                        )
                         update_terminal_output(result.stdout.strip())
                         if result.returncode != 0:
                             update_terminal_output(f"Error: {result.stderr.strip()}")
@@ -529,21 +547,41 @@ def generate_aggregate():
                 python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
                 processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
 
-                # Properly escape the paths by passing them as a list
                 command = ["python", python_script, "-i", processed_folder_path]
                 update_terminal_output(f"Running Python script: {' '.join(command)}")
 
                 # Run the command and wait for it to complete
-                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                result = subprocess.run(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+                )
                 update_terminal_output(result.stdout.strip())
                 if result.returncode != 0:
                     update_terminal_output(f"Error: {result.stderr.strip()}")
                     return
                 update_terminal_output("Python script completed successfully.")
+            except Exception as e:
+                update_terminal_output(f"Error running Python script: {e}")
 
-                # Move the output .json file to the GeneratedAgg folder
+            # Move the output .json file to the GeneratedAgg folder
+            try:
                 generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
                 os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+                # Clear the GeneratedAgg folder
+                if os.path.exists(generated_agg_folder):
+                    for file in os.listdir(generated_agg_folder):
+                        file_path = os.path.join(generated_agg_folder, file)
+                        try:
+                            if os.path.isfile(file_path) or os.path.islink(file_path):
+                                os.unlink(file_path)  # Remove the file or symlink
+                            elif os.path.isdir(file_path):
+                                shutil.rmtree(file_path)  # Remove the directory
+                        except Exception as e:
+                            update_terminal_output(f"Error clearing file {file_path}: {e}")
 
                 # Find the .json file in the processed folder
                 for file in os.listdir(processed_folder_path):
@@ -574,9 +612,9 @@ def generate_aggregate():
                 except Exception as e:
                     update_terminal_output(f"Error deleting temporary folder: {e}")
 
-                # Notify the user and open the GeneratedAgg folder
-                update_terminal_output("\n**Process completed successfully! Opening the folder with generated aggregate logs...**")
-                os.startfile(generated_agg_folder)  # Open the GeneratedAgg folder
+                # Notify the user and enable the "Open Folder" button after the process is complete
+                update_terminal_output("\n**Process completed successfully!**")
+                enable_open_folder_button()  # Enable the button
 
             except Exception as e:
                 update_terminal_output(f"Error running Python script or moving output file: {e}")
@@ -649,17 +687,6 @@ def open_config_window():
     token_entry = ttk.Entry(token_frame, width=50)
     token_entry.insert(0, config.get("DPSReportUserToken", ""))
     token_entry.pack(side="left", padx=10)
-
-    # Default Time
-    default_time_frame = ttk.Frame(top_buttons_frame)
-    default_time_frame.pack(fill="x", pady=5)
-
-    default_time_label = ttk.Label(default_time_frame, text="Default Time (YYYY-MM-DD HH:MM):")
-    default_time_label.pack(side="left", padx=5)
-
-    default_time_entry = ttk.Entry(default_time_frame, width=20)
-    default_time_entry.insert(0, config.get("default_time", datetime.now().strftime("%Y-%m-%d %H:%M")))
-    default_time_entry.pack(side="left", padx=10)
 
     # Default Hour and Minute
     time_frame = ttk.Frame(top_buttons_frame)
