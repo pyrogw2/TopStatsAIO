@@ -47,3 +47,4 @@ Navigate to the directory containing main.py and run the following command:
 ```bash
 pyinstaller --onefile --noconsole --name TopStatsAIO --distpath . --add-data "config.json;." --add-data "themes;themes" --icon "top-stats-aio.ico" main.py
 ```
+![image](https://github.com/user-attachments/assets/275b1f15-d12c-4ed2-a8be-116642bd7a61)
