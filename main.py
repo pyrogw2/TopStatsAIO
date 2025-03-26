@@ -20,14 +20,29 @@ def load_config():
                 return json.load(f)
         except Exception:
             pass
-    return {"last_path": "", "elite_insights_path": "", "top_stats_path": ""}
+    # Default configuration
+    return {
+        "last_path": "",
+        "elite_insights_path": "",
+        "top_stats_path": "",
+        "default_time": "",  # Not needed anymore
+        "default_hour": 12,  # Default to 12:00 PM
+        "default_minute": 0
+    }
 
 # Save config to file
 def save_config():
     with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
 config = load_config()
+
+# Calculate the default time dynamically
+def get_default_time():
+    today = datetime.now()
+    default_hour = config.get("default_hour", 12)
+    default_minute = config.get("default_minute", 0)
+    return today.replace(hour=default_hour, minute=default_minute, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M")
 
 # Choose root folder
 def choose_root_folder():
@@ -186,7 +201,7 @@ date_label.pack(side="left", padx=5)
 # Use ttk.Entry with the Forest theme
 date_entry = ttk.Entry(filter_frame, width=20)
 date_entry.pack(side="left", padx=5)
-date_entry.insert(0, datetime.now().strftime("%Y-%m-%d %H:%M"))
+date_entry.insert(0, get_default_time())  # Use the dynamically calculated default time
 
 select_after_button = ttk.Button(filter_frame, text="Select Recent Logs", command=select_files_after_date)
 select_after_button.pack(side="left", padx=5)
@@ -580,8 +595,38 @@ def open_config_window():
     token_entry.insert(0, config.get("DPSReportUserToken", ""))
     token_entry.pack(side="left", padx=10)
 
+    # Default Time
+    default_time_frame = ttk.Frame(top_buttons_frame)
+    default_time_frame.pack(fill="x", pady=5)
+
+    default_time_label = ttk.Label(default_time_frame, text="Default Time (YYYY-MM-DD HH:MM):")
+    default_time_label.pack(side="left", padx=5)
+
+    default_time_entry = ttk.Entry(default_time_frame, width=20)
+    default_time_entry.insert(0, config.get("default_time", datetime.now().strftime("%Y-%m-%d %H:%M")))
+    default_time_entry.pack(side="left", padx=10)
+
+    # Default Hour and Minute
+    time_frame = ttk.Frame(top_buttons_frame)
+    time_frame.pack(fill="x", pady=5)
+
+    hour_label = ttk.Label(time_frame, text="Default Hour (0-23):")
+    hour_label.pack(side="left", padx=5)
+
+    hour_entry = ttk.Entry(time_frame, width=5)
+    hour_entry.insert(0, config.get("default_hour", 12))
+    hour_entry.pack(side="left", padx=5)
+
+    minute_label = ttk.Label(time_frame, text="Default Minute (0-59):")
+    minute_label.pack(side="left", padx=5)
+
+    minute_entry = ttk.Entry(time_frame, width=5)
+    minute_entry.insert(0, config.get("default_minute", 0))
+    minute_entry.pack(side="left", padx=5)
+
     # Save Button
-    save_button = ttk.Button(config_window, text="Save", command=lambda: save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry))
+    save_button = ttk.Button(config_window, text="Save", command=lambda: save_and_close_config(
+        config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry))
     save_button.pack(anchor="e", padx=10, pady=10)
 
 def browse_folder(entry_widget):
@@ -591,12 +636,20 @@ def browse_folder(entry_widget):
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, folder)
 
-def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry):
+def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry):
     """Save the changes and close the configuration popup."""
     config["elite_insights_path"] = elite_entry.get()
     config["top_stats_path"] = top_stats_entry.get()
     config["DPSReportUserToken"] = token_entry.get()
+    config["default_hour"] = int(hour_entry.get())
+    config["default_minute"] = int(minute_entry.get())
     save_config()
+
+    # Update the default time in the main window
+    new_default_time = get_default_time()
+    date_entry.delete(0, tk.END)
+    date_entry.insert(0, new_default_time)
+
     config_window.destroy()  # Close the configuration popup
 
 # Add "Generate Aggregate" and "Select Recent Logs" buttons at the bottom
