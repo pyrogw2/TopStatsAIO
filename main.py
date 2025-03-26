@@ -178,7 +178,7 @@ tree_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 # Treeview with checkboxes for file selection
 tree = ttk.Treeview(tree_frame, columns=("modified",), selectmode="extended")
 tree.heading("#0", text="File/Folder")  # Main column for file/folder names
-tree.heading("modified", text="Last Modified")  # Secondary column for last modified date
+tree.heading("modified", text="Created")  # Change the column header to "Created"
 tree.column("#0", width=400)  # Adjust width for file/folder names
 tree.column("modified", width=150, anchor="center")  # Adjust width and alignment for last modified date
 tree.grid(row=0, column=0, sticky="nsew")
@@ -354,21 +354,36 @@ def reset_tree_checkboxes(item, full_path):
 
 def populate_tree(parent, path):
     try:
-        entries = sorted(os.listdir(path), key=lambda x: x.lower())
+        entries = os.listdir(path)
+        files = []
+        folders = []
+
+        # Separate files and folders
         for entry in entries:
-            full_path = os.path.join(path, entry)  # Combine path and entry
+            full_path = os.path.join(path, entry)
             full_path = os.path.normpath(full_path)  # Normalize the full path
             if os.path.isdir(full_path):
-                # Insert folder into the tree and recursively populate its children
-                node = tree.insert(parent, "end", text=entry, values=(""))  # No date for folders
-                tree.item(node, tags=("folder",))  # Set a placeholder tag for folders
-                populate_tree(node, full_path)
+                folders.append(entry)
             elif entry.lower().endswith(".zevtc"):
-                # Get the last modified time of the file
-                mod_time = datetime.fromtimestamp(os.path.getmtime(full_path)).strftime("%Y-%m-%d %H:%M:%S")
-                # Insert file into the tree with its last modified date
-                node = tree.insert(parent, "end", text=entry, values=(mod_time,))  # Only display the date
-                tree.item(node, tags=(full_path,))  # Store the full path in the tags
+                create_time = os.path.getctime(full_path)  # Get the creation time
+                files.append((entry, create_time, full_path))
+
+        # Sort files by creation time (newest first)
+        files.sort(key=lambda x: x[1], reverse=True)
+
+        # Add folders first (alphabetically sorted)
+        for folder in sorted(folders, key=lambda x: x.lower()):
+            full_path = os.path.join(path, folder)
+            node = tree.insert(parent, "end", text=folder, values=(""))  # No date for folders
+            tree.item(node, tags=("folder",))  # Set a placeholder tag for folders
+            populate_tree(node, full_path)
+
+        # Add files after folders
+        for file, create_time, full_path in files:
+            create_time_str = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d %H:%M:%S")
+            node = tree.insert(parent, "end", text=file, values=(create_time_str,))  # Display the creation date
+            tree.item(node, tags=(full_path,))  # Store the full path in the tags
+
     except Exception as e:
         print(f"Error reading directory {path}: {e}")
 
