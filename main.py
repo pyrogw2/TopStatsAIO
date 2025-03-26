@@ -266,60 +266,37 @@ def apply_tree_highlight(item):
 
 def on_tree_click(event):
     global last_selected
+    item_id = tree.identify_row(event.y)  # Get the item ID of the clicked row
+
+    if not item_id:
+        return
+
+    # Check if the clicked item is a folder
+    tags = tree.item(item_id, "tags")
+    if tags and tags[0] == "folder":
+        # Toggle folder expand/collapse
+        if tree.item(item_id, "open"):
+            tree.item(item_id, open=False)  # Collapse the folder
+        else:
+            tree.item(item_id, open=True)  # Expand the folder
+        return  # Exit early to avoid interfering with other functionality
+
+    # Handle clicks on files or other regions
     region = tree.identify("region", event.x, event.y)
     if region != "tree":
         return
 
-    item_id = tree.identify_row(event.y)
-    if not item_id:
-        return
-
-    tags = tree.item(item_id, "tags")
-    if not tags or tags[0] == "folder":  # Skip folders or items without valid tags
-        return
-
-    full_path = tags[0]  # Retrieve the full path from the tags
-
-    # Check if Shift key is pressed
-    if event.state & 0x0001 and last_selected:
-        # Get all items in the tree
-        all_items = []
-
-        def collect_items(item):
-            all_items.append(item)
-            for child in tree.get_children(item):
-                collect_items(child)
-
-        for root_item in tree.get_children(""):
-            collect_items(root_item)
-
-        try:
-            # Find the indices of the last selected item and the current item
-            start_index = all_items.index(last_selected)
-            end_index = all_items.index(item_id)
-
-            # Select all items in the range
-            for i in range(min(start_index, end_index), max(start_index, end_index) + 1):
-                current_item = all_items[i]
-                current_tags = tree.item(current_item, "tags")
-                if current_tags and current_tags[0].lower().endswith(".zevtc"):
-                    current_full_path = current_tags[0]
-                    if current_full_path not in checked_items:
-                        checked_items[current_full_path] = True
-                        tree.item(current_item, text="✅ " + os.path.basename(current_full_path), tags=(current_full_path,))
-        except ValueError:
-            pass
-    else:
+    full_path = tree.item(item_id, "tags")[0]
+    if full_path.lower().endswith(".zevtc"):
         # Toggle selection for the clicked item
-        if full_path.lower().endswith(".zevtc"):
-            if full_path in checked_items:
-                # Deselect the file
-                del checked_items[full_path]
-                tree.item(item_id, text=os.path.basename(full_path), tags=(full_path,))  # Reset tags
-            else:
-                # Select the file
-                checked_items[full_path] = True
-                tree.item(item_id, text="✅ " + os.path.basename(full_path), tags=(full_path,))  # Update tags
+        if full_path in checked_items:
+            # Deselect the file
+            del checked_items[full_path]
+            tree.item(item_id, text=os.path.basename(full_path), tags=(full_path,))  # Reset tags
+        else:
+            # Select the file
+            checked_items[full_path] = True
+            tree.item(item_id, text="✅ " + os.path.basename(full_path), tags=(full_path,))  # Update tags
 
     # Update the last selected item
     last_selected = item_id
