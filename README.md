@@ -1,7 +1,13 @@
 ![top-stats-aio-banner](https://github.com/user-attachments/assets/d413569d-ecb1-4618-936e-5f6fa071ba0c)
 
-Your one stop shop for generating top stats  
+Your one stop shop for generating top stats. This program uses both Elite Insights Parser as well as the GW2 EI Log combiner to create a joined aggregate of multiple WvW fight logs. This is helpful for being able to see a holistic picture of your squad's performance. **AS WITH ALL ANALYTICS, PLEASE TAKE STATS AS A TOOL AND NOT AN ABSOLUTE AUTHORITY** There are always varying circumstances to a player's performance, you should never take any analytics entirely at face value.
+[An example of a summary can be found here](https://wvwlogs.com/#202503052206-Log-Summary)
 ![image](https://github.com/user-attachments/assets/d5482ea4-7de8-4d78-90f0-88e11e6b2223)
+
+The primary directive of this application is to increase the user friendliness of these tools. Key features:
+- Ability to easily select which logs you want to aggregate
+- Ability to set a static raid time and grab logs older than a start time
+- Automatically configures and uses both EliteInsightsParser and GW2EILogCombiner to generate the final `.json` to be used with TiddlyWiki.
 
 ## Setup
 ### 1. Download Elite Insights Parser
