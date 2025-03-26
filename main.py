@@ -453,7 +453,7 @@ def generate_aggregate():
                 try:
                     for file in os.listdir(temp_dir):
                         file_path = os.path.join(temp_dir, file)
-                        if os.path.isfile(file_path) and file.lower().ends_with(".json.gz"):
+                        if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
                             # Extract the .json.gz file
                             extracted_file_path = os.path.join(processed_folder, os.path.splitext(file)[0])  # Remove .gz extension
                             with gzip.open(file_path, "rb") as gz_file:
