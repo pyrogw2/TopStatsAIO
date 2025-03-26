@@ -281,6 +281,33 @@ def on_tree_click(event):
             tree.item(item_id, open=True)  # Expand the folder
         return  # Exit early to avoid interfering with other functionality
 
+    # Handle Shift+Click for multi-selection
+    if event.state & 0x0001:  # Check if the Shift key is pressed
+        if last_selected:
+            # Get all items in the tree (recursively)
+            def get_all_items(parent=""):
+                items = []
+                for child in tree.get_children(parent):
+                    items.append(child)
+                    items.extend(get_all_items(child))
+                return items
+
+            all_items = get_all_items()
+            if last_selected in all_items and item_id in all_items:
+                start_index = all_items.index(last_selected)
+                end_index = all_items.index(item_id)
+
+                # Select all items between the last selected and the current item
+                for i in range(min(start_index, end_index), max(start_index, end_index) + 1):
+                    current_item = all_items[i]
+                    full_path = tree.item(current_item, "tags")[0]
+                    if full_path.lower().endswith(".zevtc") and full_path not in checked_items:
+                        checked_items[full_path] = True
+                        tree.item(current_item, text="✅ " + os.path.basename(full_path), tags=(full_path,))
+        last_selected = item_id
+        update_selected_list()
+        return
+
     # Handle clicks on files or other regions
     region = tree.identify("region", event.x, event.y)
     if region != "tree":
@@ -472,6 +499,8 @@ def generate_aggregate():
                 update_terminal_output("\n" + "-" * 50 + "\n")
 
                 # Signal that processing is complete
+                update_terminal_output("\n**Process completed successfully! Opening the folder with processed logs...**")
+                os.startfile(processed_folder)  # Open the folder with processed logs
                 processing_complete.set()
             except Exception as e:
                 update_terminal_output(f"Unexpected error: {e}")
