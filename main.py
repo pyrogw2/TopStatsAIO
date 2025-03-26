@@ -131,6 +131,11 @@ if os.path.exists(forest_light_path):
 # Apply the Forest theme (choose "forest-dark" or "forest-light")
 ttk.Style().theme_use("forest-dark")  # Use "forest-dark" for dark mode or "forest-light" for light mode
 
+# Set the application icon
+icon_path = os.path.join(os.getcwd(), "top-stats-aio.ico")
+if os.path.exists(icon_path):
+    root.iconbitmap(icon_path)
+
 # Make the window resizable
 root.rowconfigure(1, weight=1)  # Allow the main content area to expand
 root.columnconfigure(0, weight=1)  # Allow horizontal expansion
