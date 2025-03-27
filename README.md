@@ -55,5 +55,6 @@ pyinstaller --onefile --noconsole --name TopStatsAIO --distpath . --add-data "co
 ```
 ## Recognition
 Thank you to the GW2 Analytics communinty and Drevarr specifically for helping create this. Shout out to my PAN friends for the excitement and eagerness to help test. Thank you Aza for inspiring me to finally write this UI! Huge thanks to Paralda for informing me of the latest and greatest
-<img src="https://github.com/user-attachments/assets/81650120-8d69-4259-90b0-f84ba5a8d986" width=300>
+
+<img src="https://github.com/user-attachments/assets/81650120-8d69-4259-90b0-f84ba5a8d986" width=350>
 
