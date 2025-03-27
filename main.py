@@ -457,200 +457,300 @@ def generate_aggregate():
         open_folder_button.config(state="normal", style="Green.TButton")  # Enable the button and apply the green style
 
     def process_files():
-        processing_complete = threading.Event()  # Event to signal when processing is complete
-
-        def process_zevtc_files():
-            try:
-                # Copy files with progress
-                total_files = len(checked_items)
-                update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
-                for i, full_path in enumerate(checked_items.keys(), start=1):
-                    try:
-                        shutil.copy(full_path, temp_dir)
-                        progress = int((i / total_files) * 50)  # ASCII progress bar length
-                        progress_bar = "[" + "#" * progress + "-" * (50 - progress) + "]"
-                        update_terminal_output(f"{progress_bar} {i}/{total_files} - Copied: {os.path.basename(full_path)}")
-                    except Exception as e:
-                        update_terminal_output(f"Error copying file {full_path}: {e}")
-
-                # Add a separator after copying files
-                update_terminal_output("\n" + "-" * 50 + "\n")
-
-                # Locate the Elite Insights executable
-                ei_exec = None
-                elite_insights_path = config.get("elite_insights_path", "")
-                if os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")):
-                    ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")
-                elif os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")):
-                    ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")
-                else:
-                    update_terminal_output("No valid Guild Wars 2 Elite Insights executable found.")
-                    processing_complete.set()  # Signal completion
-                    return
-
-                # Use the configuration template from the root of the project directory
-                template_conf_file = os.path.join(os.getcwd(), "EliteInsightsConfigTemplate.conf")
-                edited_conf_file = os.path.join(temp_dir, "EliteInsightConfig.conf")
-
-                if not os.path.exists(template_conf_file):
-                    update_terminal_output(f"Configuration template file not found: {template_conf_file}")
-                    processing_complete.set()  # Signal completion
-                    return
-
-                # Edit the .conf file to set OutLocation to the temporary folder
-                edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
-
-                # Process .zevtc files using Elite Insights
+        try:
+            # Copy selected files to the temporary folder
+            total_files = len(checked_items)
+            update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
+            for i, full_path in enumerate(checked_items.keys(), start=1):
                 try:
-                    update_terminal_output("Processing .zevtc files with Elite Insights...")
-                    zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
-                    for i, file in enumerate(zevtc_files, start=1):
-                        file_path = os.path.join(temp_dir, file)
-                        command = [ei_exec, "-c", edited_conf_file, file_path]
-                        update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
-                        result = subprocess.run(
-                            command,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
-                        )
-                        update_terminal_output(result.stdout.strip())
-                        if result.returncode != 0:
-                            update_terminal_output(f"Error: {result.stderr.strip()}")
+                    shutil.copy(full_path, temp_dir)
+                    progress = int((i / total_files) * 50)  # ASCII progress bar length
+                    progress_bar = "[" + "#" * progress + "-" * (50 - progress) + "]"
+                    # Append the progress bar as a new line
+                    update_terminal_output(f"{progress_bar} {i}/{total_files} - Copied: {os.path.basename(full_path)}")
                 except Exception as e:
-                    update_terminal_output(f"Error processing files with Elite Insights: {e}")
-                    processing_complete.set()  # Signal completion
-                    return
+                    update_terminal_output(f"Error copying file {full_path}: {e}")
 
-                # Add a separator after processing with Elite Insights
-                update_terminal_output("\n" + "-" * 50 + "\n")
+            # Add a separator after copying files
+            update_terminal_output("\n" + "-" * 50 + "\n")
 
-                # Ensure the ProcessedLogs folder exists
-                processed_folder = os.path.join(temp_dir, "ProcessedLogs")
-                os.makedirs(processed_folder, exist_ok=True)
+            # Check the parser selection
+            parser_selection = config.get("parser_selection", "GW2_EI_log_combiner")
 
-                # Ensure the folder is writable
-                import stat
-                os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-
-                # Move .json.gz files to the ProcessedLogs folder
-                try:
-                    for file in os.listdir(temp_dir):
-                        file_path = os.path.join(temp_dir, file)
-                        if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
-                            # Move the .json.gz file to the ProcessedLogs folder
-                            destination_path = os.path.join(processed_folder, file)
-                            shutil.move(file_path, destination_path)
-                            update_terminal_output(f"Moved: {file} -> {destination_path}")
-                    update_terminal_output(f"All .json.gz files have been moved to: {processed_folder}")
-                except Exception as e:
-                    update_terminal_output(f"Error moving .json.gz files: {e}")
-                    processing_complete.set()  # Signal completion
-                    return
-
-                # Signal that processing is complete
-                processing_complete.set()
-            except Exception as e:
-                update_terminal_output(f"Unexpected error: {e}")
-                processing_complete.set()
-
-        # Start the processing in a separate thread
-        threading.Thread(target=process_zevtc_files).start()
-
-        # Wait for processing to complete before running the TopStats.exe executable
-        def wait_and_run_script():
-            processing_complete.wait()  # Wait for the event to be set
-
-            # Run the TopStats.exe executable
-            try:
-                top_stats_exe = os.path.join(config.get("top_stats_path", ""), "TopStats.exe")
-                processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
-
-                if not os.path.exists(top_stats_exe):
-                    update_terminal_output(f"Error: TopStats.exe not found at {top_stats_exe}")
-                    return
-
-                command = [top_stats_exe, "-i", processed_folder_path]
-                update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
-
-                # Run the command and wait for it to complete
-                result = subprocess.run(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
-                )
-                update_terminal_output(result.stdout.strip())
-                if result.returncode != 0:
-                    update_terminal_output(f"Error: {result.stderr.strip()}")
-                    return
-                update_terminal_output("TopStats.exe completed successfully.")
-            except Exception as e:
-                update_terminal_output(f"Error running TopStats.exe: {e}")
-
-            # Move the output .json file to the GeneratedAgg folder
-            try:
-                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
-                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
-
-                # Clear the GeneratedAgg folder
-                if os.path.exists(generated_agg_folder):
-                    for file in os.listdir(generated_agg_folder):
-                        file_path = os.path.join(generated_agg_folder, file)
-                        try:
-                            if os.path.isfile(file_path) or os.path.islink(file_path):
-                                os.unlink(file_path)  # Remove the file or symlink
-                            elif os.path.isdir(file_path):
-                                shutil.rmtree(file_path)  # Remove the directory
-                        except Exception as e:
-                            update_terminal_output(f"Error clearing file {file_path}: {e}")
-
-                # Find the .json file in the processed folder
-                for file in os.listdir(processed_folder_path):
-                    if file.lower().endswith(".json"):
-                        source_path = os.path.join(processed_folder_path, file)
-                        destination_path = os.path.join(generated_agg_folder, file)
-                        shutil.move(source_path, destination_path)
-                        update_terminal_output(f"Moved output file to: {destination_path}")
-                        break
-                else:
-                    update_terminal_output("No .json output file found in the processed folder.")
-                    return  # Exit early if no .json file is found
-                
-                # Add a separator after moving .json.gz files
-                update_terminal_output("\n" + "-" * 50 + "\n")
-
-                # Move the output .json file to the GeneratedAgg folder
-                generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
-                os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
-
-                # Delete the temporary folder
-                try:
-                    if os.path.exists(temp_dir):
-                        shutil.rmtree(temp_dir)  # Remove the temporary folder
-                        update_terminal_output(f"Temporary folder deleted: {temp_dir}")
-                    else:
-                        update_terminal_output(f"Temporary folder not found: {temp_dir}")
-                except Exception as e:
-                    update_terminal_output(f"Error deleting temporary folder: {e}")
-
-                # Notify the user and enable the "Open Folder" button after the process is complete
-                update_terminal_output("\n**Process completed successfully!**")
-                enable_open_folder_button()  # Enable the button
-
-            except Exception as e:
-                update_terminal_output(f"Error running TopStats.exe or moving output file: {e}")
-
-        # Start the script execution in a separate thread
-        threading.Thread(target=wait_and_run_script).start()
+            if parser_selection == "GW2_EI_log_combiner":
+                # Existing behavior for GW2_EI_log_combiner
+                process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_open_folder_button)
+            elif parser_selection == "arcdps_top_stats_parser":
+                # New behavior for arcdps_top_stats_parser
+                process_with_arcdps_top_stats_parser(temp_dir, update_terminal_output, enable_open_folder_button)
+            else:
+                update_terminal_output(f"Unknown parser selection: {parser_selection}")
+        except Exception as e:
+            update_terminal_output(f"Unexpected error: {e}")
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
 
     progress_popup.update_idletasks()  # Force the window to update its layout
     progress_popup.geometry(f"{progress_popup.winfo_width()}x{progress_popup.winfo_height()}")
+
+def process_with_arcdps_top_stats_parser(temp_dir, update_terminal_output, enable_open_folder_button):
+    """Process files using arcdps_top_stats_parser."""
+    try:
+        top_stats_folder = config.get("old_top_stats_path", "")
+        ei_folder = config.get("elite_insights_path", "")
+        target_folder = temp_dir
+
+        if not os.path.exists(top_stats_folder):
+            update_terminal_output(f"Error: (OLD) Top Stats Parser folder not found: {top_stats_folder}")
+            return
+
+        if not os.path.exists(ei_folder):
+            update_terminal_output(f"Error: Elite Insights folder not found: {ei_folder}")
+            return
+
+        # Construct the batch command
+        bash_command = f'"{top_stats_folder}\\TW5_parsing_arc_top_stats.bat" "{target_folder}" "{ei_folder}" "{top_stats_folder}"'
+        update_terminal_output(f"Running command: {bash_command}")
+
+        # Run the batch command and pipe the output to the terminal
+        result = subprocess.run(
+            bash_command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+        )
+
+        # Pipe the output to the terminal
+        if result.stdout:
+            update_terminal_output(result.stdout.strip())
+        if result.stderr:
+            update_terminal_output(f"Error: {result.stderr.strip()}")
+
+        if result.returncode != 0:
+            update_terminal_output(f"Batch command failed with return code {result.returncode}")
+            return
+
+        # Ensure the GeneratedAgg folder exists and is cleared
+        generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+        os.makedirs(generated_agg_folder, exist_ok=True)
+
+        # Clear the GeneratedAgg folder
+        for file in os.listdir(generated_agg_folder):
+            file_path = os.path.join(generated_agg_folder, file)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # Remove the file or symlink
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)  # Remove the directory
+            except Exception as e:
+                update_terminal_output(f"Error clearing file {file_path}: {e}")
+
+        # Move all .tid files to the GeneratedAgg folder
+        for file in os.listdir(temp_dir):
+            if file.lower().endswith(".tid"):
+                source_path = os.path.join(temp_dir, file)
+                destination_path = os.path.join(generated_agg_folder, file)
+                shutil.move(source_path, destination_path)
+                update_terminal_output(f"Moved .tid file: {file} -> {destination_path}")
+
+        # Notify the user and enable the "Open Folder" button
+        update_terminal_output("\n**Process completed successfully!**")
+        enable_open_folder_button()
+    except Exception as e:
+        update_terminal_output(f"Error processing with arcdps_top_stats_parser: {e}")
+
+def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_open_folder_button):
+    processing_complete = threading.Event()  # Event to signal when processing is complete
+
+    def process_zevtc_files():
+        try:
+            # # Copy files with progress
+            # total_files = len(checked_items)
+            # update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
+            # for i, full_path in enumerate(checked_items.keys(), start=1):
+            #     try:
+            #         shutil.copy(full_path, temp_dir)
+            #         progress = int((i / total_files) * 50)  # ASCII progress bar length
+            #         progress_bar = "[" + "#" * progress + "-" * (50 - progress) + "]"
+            #         update_terminal_output(f"{progress_bar} {i}/{total_files} - Copied: {os.path.basename(full_path)}")
+            #     except Exception as e:
+            #         update_terminal_output(f"Error copying file {full_path}: {e}")
+
+            # # Add a separator after copying files
+            # update_terminal_output("\n" + "-" * 50 + "\n")
+
+            # Locate the Elite Insights executable
+            ei_exec = None
+            elite_insights_path = config.get("elite_insights_path", "")
+            if os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")):
+                ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights.exe")
+            elif os.path.exists(os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")):
+                ei_exec = os.path.join(elite_insights_path, "GuildWars2EliteInsights-CLI.exe")
+            else:
+                update_terminal_output("No valid Guild Wars 2 Elite Insights executable found.")
+                processing_complete.set()  # Signal completion
+                return
+
+            # Use the configuration template from the root of the project directory
+            template_conf_file = os.path.join(os.getcwd(), "EliteInsightsConfigTemplate.conf")
+            edited_conf_file = os.path.join(temp_dir, "EliteInsightConfig.conf")
+
+            if not os.path.exists(template_conf_file):
+                update_terminal_output(f"Configuration template file not found: {template_conf_file}")
+                processing_complete.set()  # Signal completion
+                return
+
+            # Edit the .conf file to set OutLocation to the temporary folder
+            edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
+
+            # Process .zevtc files using Elite Insights
+            try:
+                update_terminal_output("Processing .zevtc files with Elite Insights...")
+                zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
+                for i, file in enumerate(zevtc_files, start=1):
+                    file_path = os.path.join(temp_dir, file)
+                    command = [ei_exec, "-c", edited_conf_file, file_path]
+                    update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
+                    result = subprocess.run(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+                    )
+                    update_terminal_output(result.stdout.strip())
+                    if result.returncode != 0:
+                        update_terminal_output(f"Error: {result.stderr.strip()}")
+            except Exception as e:
+                update_terminal_output(f"Error processing files with Elite Insights: {e}")
+                processing_complete.set()  # Signal completion
+                return
+
+            # Add a separator after processing with Elite Insights
+            update_terminal_output("\n" + "-" * 50 + "\n")
+
+            # Ensure the ProcessedLogs folder exists
+            processed_folder = os.path.join(temp_dir, "ProcessedLogs")
+            os.makedirs(processed_folder, exist_ok=True)
+
+            # Ensure the folder is writable
+            import stat
+            os.chmod(processed_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+
+            # Move .json.gz files to the ProcessedLogs folder
+            try:
+                for file in os.listdir(temp_dir):
+                    file_path = os.path.join(temp_dir, file)
+                    if os.path.isfile(file_path) and file.lower().endswith(".json.gz"):
+                        # Move the .json.gz file to the ProcessedLogs folder
+                        destination_path = os.path.join(processed_folder, file)
+                        shutil.move(file_path, destination_path)
+                        update_terminal_output(f"Moved: {file} -> {destination_path}")
+                update_terminal_output(f"All .json.gz files have been moved to: {processed_folder}")
+            except Exception as e:
+                update_terminal_output(f"Error moving .json.gz files: {e}")
+                processing_complete.set()  # Signal completion
+                return
+
+            # Signal that processing is complete
+            processing_complete.set()
+        except Exception as e:
+            update_terminal_output(f"Unexpected error: {e}")
+            processing_complete.set()
+
+    # Start the processing in a separate thread
+    threading.Thread(target=process_zevtc_files).start()
+
+    # Wait for processing to complete before running the TopStats.exe executable
+    def wait_and_run_script():
+        processing_complete.wait()  # Wait for the event to be set
+
+        # Run the TopStats.exe executable
+        try:
+            top_stats_exe = os.path.join(config.get("top_stats_path", ""), "TopStats.exe")
+            processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
+
+            if not os.path.exists(top_stats_exe):
+                update_terminal_output(f"Error: TopStats.exe not found at {top_stats_exe}")
+                return
+
+            command = [top_stats_exe, "-i", processed_folder_path]
+            update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
+
+            # Run the command and wait for it to complete
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+            )
+            update_terminal_output(result.stdout.strip())
+            if result.returncode != 0:
+                update_terminal_output(f"Error: {result.stderr.strip()}")
+                return
+            update_terminal_output("TopStats.exe completed successfully.")
+        except Exception as e:
+            update_terminal_output(f"Error running TopStats.exe: {e}")
+
+        # Move the output .json file to the GeneratedAgg folder
+        try:
+            generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+            os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+            # Clear the GeneratedAgg folder
+            if os.path.exists(generated_agg_folder):
+                for file in os.listdir(generated_agg_folder):
+                    file_path = os.path.join(generated_agg_folder, file)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)  # Remove the file or symlink
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)  # Remove the directory
+                    except Exception as e:
+                        update_terminal_output(f"Error clearing file {file_path}: {e}")
+
+            # Find the .json file in the processed folder
+            for file in os.listdir(processed_folder_path):
+                if file.lower().endswith(".json"):
+                    source_path = os.path.join(processed_folder_path, file)
+                    destination_path = os.path.join(generated_agg_folder, file)
+                    shutil.move(source_path, destination_path)
+                    update_terminal_output(f"Moved output file to: {destination_path}")
+                    break
+            else:
+                update_terminal_output("No .json output file found in the processed folder.")
+                return  # Exit early if no .json file is found
+            
+            # Add a separator after moving .json.gz files
+            update_terminal_output("\n" + "-" * 50 + "\n")
+
+            # Move the output .json file to the GeneratedAgg folder
+            generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+            os.makedirs(generated_agg_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+            # Delete the temporary folder
+            try:
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)  # Remove the temporary folder
+                    update_terminal_output(f"Temporary folder deleted: {temp_dir}")
+                else:
+                    update_terminal_output(f"Temporary folder not found: {temp_dir}")
+            except Exception as e:
+                update_terminal_output(f"Error deleting temporary folder: {e}")
+
+            # Notify the user and enable the "Open Folder" button after the process is complete
+            update_terminal_output("\n**Process completed successfully!**")
+            enable_open_folder_button()  # Enable the button
+
+        except Exception as e:
+            update_terminal_output(f"Error running TopStats.exe or moving output file: {e}")
+
+    # Start the script execution in a separate thread
+    threading.Thread(target=wait_and_run_script).start()
 
 def edit_conf_file(template_path, output_path, temp_dir):
     """Edit the Elite Insights configuration file."""
@@ -684,7 +784,7 @@ def open_config_window():
     # Create the configuration window
     config_window_instance = Toplevel(root)
     config_window_instance.title("Configuration")
-    config_window_instance.geometry("500x400")
+    config_window_instance.geometry("500x500")
     config_window_instance.resizable(False, False)
     config_window_instance.configure(bg="#333333")  # Match the Forest theme's dark background color
 
@@ -713,6 +813,30 @@ def open_config_window():
     top_stats_entry = ttk.Entry(top_stats_frame, width=50)
     top_stats_entry.insert(0, config.get("top_stats_path", ""))
     top_stats_entry.pack(side="left", padx=10)
+
+    # (OLD) Top Stats Parser Folder
+    old_top_stats_frame = ttk.Frame(top_buttons_frame)
+    old_top_stats_frame.pack(fill="x", pady=5)
+
+    old_top_stats_button = ttk.Button(old_top_stats_frame, text="Set (OLD) Top Stats Parser Folder", command=lambda: browse_folder(old_top_stats_entry))
+    old_top_stats_button.pack(side="left", padx=5)
+
+    old_top_stats_entry = ttk.Entry(old_top_stats_frame, width=50)
+    old_top_stats_entry.insert(0, config.get("old_top_stats_path", ""))
+    old_top_stats_entry.pack(side="left", padx=10)
+
+    # Radio Button for Parser Selection
+    parser_selection_frame = ttk.LabelFrame(top_buttons_frame, text="Parser Selection", padding=10)
+    parser_selection_frame.pack(fill="x", pady=10)
+
+    # Set the default value to "GW2_EI_log_combiner"
+    parser_selection = tk.StringVar(value=config.get("parser_selection", "GW2_EI_log_combiner"))
+
+    arcdps_radio = ttk.Radiobutton(parser_selection_frame, text="arcdps_top_stats_parser", variable=parser_selection, value="arcdps_top_stats_parser")
+    arcdps_radio.pack(anchor="w", padx=5)
+
+    gw2_ei_radio = ttk.Radiobutton(parser_selection_frame, text="GW2_EI_log_combiner", variable=parser_selection, value="GW2_EI_log_combiner")
+    gw2_ei_radio.pack(anchor="w", padx=5)
 
     # DPSReportUserToken
     token_frame = ttk.Frame(top_buttons_frame)
@@ -745,7 +869,7 @@ def open_config_window():
 
     # Save Button
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
-        config_window_instance, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry))
+        config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection))
     save_button.pack(anchor="e", padx=10, pady=10)
 
     # Handle window close event
@@ -770,10 +894,11 @@ def browse_folder(entry_widget):
     if config_window_instance:
         config_window_instance.lift()
 
-def save_and_close_config(config_window, elite_entry, top_stats_entry, token_entry, hour_entry, minute_entry):
+def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection):
     """Save the changes and close the configuration popup."""
     elite_path = elite_entry.get()
     top_stats_path = top_stats_entry.get()
+    old_top_stats_path = old_top_stats_entry.get()
     token = token_entry.get()
 
     # Validate Elite Insights Path
@@ -806,9 +931,11 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, token_ent
     # Save the configuration
     config["elite_insights_path"] = elite_path
     config["top_stats_path"] = top_stats_path
+    config["old_top_stats_path"] = old_top_stats_path  # Save the (OLD) Top Stats Parser path
     config["DPSReportUserToken"] = token  # Save the token even if it's empty
     config["default_hour"] = hour
     config["default_minute"] = minute
+    config["parser_selection"] = parser_selection.get()  # Save the parser selection
     save_config()
 
     # Update the default time in the main window
