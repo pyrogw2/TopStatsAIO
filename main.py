@@ -10,6 +10,7 @@ from tkinter import Toplevel, Label, ttk, messagebox
 import subprocess
 import threading
 import gzip
+import requests
 
 CONFIG_FILE = "config.json"
 
