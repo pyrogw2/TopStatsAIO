@@ -37,9 +37,14 @@ https://github.com/Drevarr/GW2_EI_log_combiner/releases
 11. Let the process run, once complete you will see a button appear to `Open Folder`
 ![image](https://github.com/user-attachments/assets/0a6b786b-ab30-4903-9050-b3502fa7e9c9)
 12. Drag & Drop that `.json` file into your TiddlyWiki of choice!
+#### OPTIONALLY
+You can use this app with the older [Drevarr/arcdps_top_stats_parser](https://github.com/Drevarr/arcdps_top_stats_parser) by going to config and setting the folder path as well as toggling on the `top_stats_parser` option.
 
-## Compiling EXE
+![image](https://github.com/user-attachments/assets/a84bcfe6-73ce-4ec3-9435-4a261fd1cf5f)
 
+
+## Local Dev
+### Compile EXE
 To compile the Python script into an executable (`.exe`), follow these steps:
 
 1. **Install PyInstaller**  
@@ -52,6 +57,11 @@ Navigate to the directory containing main.py and run the following command:
 ```bash
 pyinstaller --onefile --noconsole --name TopStatsAIO --distpath . --add-data "config.json;." --add-data "themes;themes" --icon "top-stats-aio.ico" main.py
 ```
+### Running locally
+1. Clone the repository
+2. Navigate to it in a terminal
+3. Run `python main.py`
+
 ## Recognition
 Thank you to the GW2 Analytics communinty and Drevarr specifically for helping create this. Shout out to my PAN friends for the excitement and eagerness to help test. Thank you Aza for inspiring me to finally write this UI! Huge thanks to Paralda for informing me of the latest and greatest
 
