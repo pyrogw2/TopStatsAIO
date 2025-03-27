@@ -10,6 +10,10 @@ from tkinter import Toplevel, Label, ttk, messagebox
 import subprocess
 import threading
 import gzip
+import requests
+import zipfile
+import io
+import re
 
 CONFIG_FILE = "config.json"
 
@@ -169,7 +173,11 @@ elif selected_theme == "light":
 # Set the application icon
 icon_path = os.path.join(os.getcwd(), "top-stats-aio.ico")
 if os.path.exists(icon_path):
-    root.iconbitmap(icon_path)
+    try:
+        root.iconbitmap(icon_path)
+    except Exception as e:
+        print(f"Could not load icon: {e}")
+        # This error is non-critical, so we'll continue running the app
 
 # Make the window resizable
 root.rowconfigure(1, weight=1)  # Allow the main content area to expand
@@ -832,6 +840,18 @@ def open_config_window():
     elif selected_theme == "light":
         config_window_instance.configure(bg="#FFFFFF")  # Light background
 
+    # Download prerequisites frame
+    download_frame = ttk.LabelFrame(config_window_instance, text="Download Prerequisites", padding=10)
+    download_frame.pack(fill="both", expand=False, padx=10, pady=10)
+    
+    gw2eicli_button = ttk.Button(download_frame, text="Download Latest GW2EICLI", 
+                                 command=lambda: download_gw2eicli(config_window_instance))
+    gw2eicli_button.pack(fill="x", pady=5)
+    
+    combiner_button = ttk.Button(download_frame, text="Download Latest GW2 EI Log Combiner", 
+                                command=lambda: download_gw2_ei_log_combiner(config_window_instance))
+    combiner_button.pack(fill="x", pady=5)
+    
     # Configuration frame
     top_buttons_frame = ttk.LabelFrame(config_window_instance, text="Configuration", padding=10)
     top_buttons_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -1004,6 +1024,344 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_s
     apply_theme()
 
     config_window.destroy()  # Close the configuration popup
+
+def download_gw2eicli(parent_window):
+    """Download the latest GW2EICLI release from GitHub."""
+    # Create a progress dialog
+    progress_dialog = Toplevel(parent_window)
+    progress_dialog.title("Downloading GW2EICLI")
+    progress_dialog.geometry("400x200")
+    progress_dialog.resizable(False, False)
+    progress_dialog.transient(parent_window)
+    progress_dialog.grab_set()  # Make the dialog modal
+
+    # Apply the current theme to the progress dialog
+    selected_theme = config.get("theme", "dark")
+    if selected_theme == "dark":
+        progress_dialog.configure(bg="#333333")  # Dark background
+        label_fg = "#FFFFFF"  # White text
+    elif selected_theme == "light":
+        progress_dialog.configure(bg="#FFFFFF")  # Light background
+        label_fg = "#000000"  # Black text
+
+    # Add status label
+    status_label = ttk.Label(progress_dialog, text="Fetching latest release information...", foreground=label_fg)
+    status_label.pack(pady=20)
+
+    # Add progress bar
+    progress_bar = ttk.Progressbar(progress_dialog, orient="horizontal", length=350, mode="indeterminate")
+    progress_bar.pack(pady=10)
+    progress_bar.start()
+
+    def download_thread():
+        try:
+            # Step 1: Get the latest release information
+            status_label.config(text="Fetching latest release information...")
+            api_url = "https://api.github.com/repos/baaron4/GW2-Elite-Insights-Parser/releases/latest"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            release_data = response.json()
+
+            # Step 2: Find the GW2EICLI.zip asset
+            zip_asset = None
+            for asset in release_data.get("assets", []):
+                if asset["name"] == "GW2EICLI.zip":
+                    zip_asset = asset
+                    break
+
+            if not zip_asset:
+                progress_dialog.after(0, lambda: messagebox.showerror(
+                    "Download Error",
+                    "GW2EICLI.zip not found in the latest release",
+                    parent=progress_dialog
+                ))
+                progress_dialog.after(100, progress_dialog.destroy)
+                return
+
+            # Step 3: Download the zip file
+            status_label.config(text="Downloading GW2EICLI.zip...")
+            download_url = zip_asset["browser_download_url"]
+            response = requests.get(download_url, stream=True)
+            response.raise_for_status()
+
+            # Step 4: Ask user for installation directory
+            progress_dialog.after(0, progress_bar.stop)
+
+            def ask_directory():
+                nonlocal progress_dialog
+
+                # Create a dedicated downloads directory if it doesn't exist
+                downloads_dir = os.path.join(os.getcwd(), "prerequisites")
+                os.makedirs(downloads_dir, exist_ok=True)
+
+                # Create a tool-specific directory
+                gw2eicli_dir = os.path.join(downloads_dir, "GW2EICLI")
+                os.makedirs(gw2eicli_dir, exist_ok=True)
+
+                # Default to the dedicated directory, but allow user to choose
+                initial_dir = config.get("elite_insights_path", "") if os.path.exists(config.get("elite_insights_path", "")) else gw2eicli_dir
+
+                # Ask if user wants to use the default directory
+                use_default = messagebox.askyesno(
+                    "Installation Directory",
+                    f"Do you want to install GW2EICLI to the default location?\n\n{gw2eicli_dir}",
+                    parent=progress_dialog
+                )
+
+                if use_default:
+                    install_dir = gw2eicli_dir
+                else:
+                    install_dir = filedialog.askdirectory(
+                        title="Select GW2EICLI Installation Directory",
+                        initialdir=initial_dir,
+                        parent=progress_dialog
+                    )
+
+                if not install_dir:
+                    progress_dialog.destroy()
+                    return
+
+                progress_bar.config(mode="determinate", maximum=100, value=0)
+                status_label.config(text="Extracting files...")
+
+                # Step 5: Extract the zip file
+                try:
+                    z = zipfile.ZipFile(io.BytesIO(response.content))
+                    total_files = len(z.namelist())
+
+                    # Create the directory if it doesn't exist
+                    os.makedirs(install_dir, exist_ok=True)
+
+                    # Extract all files
+                    for i, file in enumerate(z.namelist()):
+                        z.extract(file, install_dir)
+                        progress = int((i + 1) / total_files * 100)
+                        progress_bar.config(value=progress)
+                        status_label.config(text=f"Extracting: {progress}% complete")
+                        progress_dialog.update()
+
+                    # Step 6: Update the configuration
+                    config["elite_insights_path"] = install_dir
+
+                    # Save version information
+                    if "prerequisites" not in config:
+                        config["prerequisites"] = {}
+
+                    config["prerequisites"]["GW2EICLI_version"] = release_data.get("tag_name", "unknown")
+                    config["prerequisites"]["GW2EICLI_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                    save_config()
+
+                    # Update the entry field in the config window if it's open
+                    try:
+                        for widget in parent_window.winfo_children():
+                            if isinstance(widget, ttk.LabelFrame) and widget.winfo_children():
+                                for frame in widget.winfo_children():
+                                    if isinstance(frame, ttk.Frame):
+                                        for child in frame.winfo_children():
+                                            if isinstance(child, ttk.Entry) and child.get() == initial_dir:
+                                                child.delete(0, tk.END)
+                                                child.insert(0, install_dir)
+                                                break
+                    except Exception as e:
+                        print(f"Error updating config window: {e}")
+
+                    status_label.config(text="Installation complete!")
+                    progress_dialog.after(1000, progress_dialog.destroy)
+
+                    # Show success message
+                    messagebox.showinfo(
+                        "Download Complete",
+                        f"GW2EICLI has been downloaded and installed to:\n{install_dir}",
+                        parent=parent_window
+                    )
+                except Exception as e:
+                    messagebox.showerror(
+                        "Extraction Error",
+                        f"Failed to extract the zip file: {str(e)}",
+                        parent=progress_dialog
+                    )
+                    progress_dialog.destroy()
+
+            progress_dialog.after(0, ask_directory)
+
+        except Exception as e:
+            progress_dialog.after(0, lambda: messagebox.showerror(
+                "Download Error",
+                f"Failed to download GW2EICLI: {str(e)}",
+                parent=progress_dialog
+            ))
+            progress_dialog.after(100, progress_dialog.destroy)
+
+    # Start the download thread
+    threading.Thread(target=download_thread, daemon=True).start()
+
+def download_gw2_ei_log_combiner(parent_window):
+    """Download the latest GW2 EI Log Combiner prerelease from GitHub."""
+    # Create a progress dialog
+    progress_dialog = Toplevel(parent_window)
+    progress_dialog.title("Downloading GW2 EI Log Combiner")
+    progress_dialog.geometry("400x200")
+    progress_dialog.resizable(False, False)
+    progress_dialog.transient(parent_window)
+    progress_dialog.grab_set()  # Make the dialog modal
+    
+    # Add status label
+    status_label = ttk.Label(progress_dialog, text="Fetching latest prerelease information...")
+    status_label.pack(pady=20)
+    
+    # Add progress bar
+    progress_bar = ttk.Progressbar(progress_dialog, orient="horizontal", length=350, mode="indeterminate")
+    progress_bar.pack(pady=10)
+    progress_bar.start()
+    
+    def download_thread():
+        try:
+            # Step 1: Get the latest prerelease information
+            status_label.config(text="Fetching latest prerelease information...")
+            api_url = "https://api.github.com/repos/Drevarr/GW2_EI_log_combiner/releases?per_page=10"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            releases_data = response.json()
+            
+            # Find the latest prerelease
+            prerelease = None
+            for release in releases_data:
+                if release.get("prerelease", False):
+                    prerelease = release
+                    break
+            
+            if not prerelease:
+                progress_dialog.after(0, lambda: messagebox.showerror("Download Error", 
+                                                                 "No prereleases found for GW2 EI Log Combiner",
+                                                                 parent=progress_dialog))
+                progress_dialog.after(100, progress_dialog.destroy)
+                return
+            
+            # Step 2: Find the asset (assuming it's a zip file)
+            zip_asset = None
+            for asset in prerelease.get("assets", []):
+                if asset["name"].endswith(".zip"):
+                    zip_asset = asset
+                    break
+            
+            if not zip_asset:
+                progress_dialog.after(0, lambda: messagebox.showerror("Download Error", 
+                                                                 "No zip file found in the latest prerelease",
+                                                                 parent=progress_dialog))
+                progress_dialog.after(100, progress_dialog.destroy)
+                return
+            
+            # Step 3: Download the zip file
+            status_label.config(text=f"Downloading {zip_asset['name']}...")
+            download_url = zip_asset["browser_download_url"]
+            response = requests.get(download_url, stream=True)
+            response.raise_for_status()
+            
+            # Step 4: Ask user for installation directory
+            progress_dialog.after(0, progress_bar.stop)
+            
+            def ask_directory():
+                nonlocal progress_dialog
+                
+                # Create a dedicated downloads directory if it doesn't exist
+                downloads_dir = os.path.join(os.getcwd(), "prerequisites")
+                os.makedirs(downloads_dir, exist_ok=True)
+                
+                # Create a tool-specific directory
+                combiner_dir = os.path.join(downloads_dir, "GW2_EI_log_combiner")
+                os.makedirs(combiner_dir, exist_ok=True)
+                
+                # Default to the dedicated directory, but allow user to choose
+                initial_dir = config.get("top_stats_path", "") if os.path.exists(config.get("top_stats_path", "")) else combiner_dir                
+                # Ask if user wants to use the default directory
+                use_default = messagebox.askyesno(
+                    "Installation Directory",
+                    f"Do you want to install GW2 EI Log Combiner to the default location?\n\n{combiner_dir}",
+                    parent=progress_dialog
+                )
+                
+                if use_default:
+                    install_dir = combiner_dir
+                else:
+                    install_dir = filedialog.askdirectory(
+                        title="Select GW2 EI Log Combiner Installation Directory", 
+                        initialdir=initial_dir,
+                        parent=progress_dialog
+                    )
+                
+                if not install_dir:
+                    progress_dialog.destroy()
+                    return
+                
+                progress_bar.config(mode="determinate", maximum=100, value=0)
+                status_label.config(text="Extracting files...")
+                
+                # Step 5: Extract the zip file
+                try:
+                    z = zipfile.ZipFile(io.BytesIO(response.content))
+                    total_files = len(z.namelist())
+                    
+                    # Create the directory if it doesn't exist
+                    os.makedirs(install_dir, exist_ok=True)
+                    
+                    # Extract all files
+                    for i, file in enumerate(z.namelist()):
+                        z.extract(file, install_dir)
+                        progress = int((i + 1) / total_files * 100)
+                        progress_bar.config(value=progress)
+                        status_label.config(text=f"Extracting: {progress}% complete")
+                        progress_dialog.update()
+                    
+                    # Step 6: Update the configuration
+                    config["top_stats_path"] = install_dir
+                    
+                    # Save version information
+                    if "prerequisites" not in config:
+                        config["prerequisites"] = {}
+                    
+                    config["prerequisites"]["GW2_EI_log_combiner_version"] = prerelease.get("tag_name", "unknown")
+                    config["prerequisites"]["GW2_EI_log_combiner_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    save_config()
+                    
+                    # Update the entry field in the config window if it's open
+                    try:
+                        for widget in parent_window.winfo_children():
+                            if isinstance(widget, ttk.LabelFrame) and widget.winfo_children():
+                                for frame in widget.winfo_children():
+                                    if isinstance(frame, ttk.Frame):
+                                        for child in frame.winfo_children():
+                                            if isinstance(child, ttk.Entry) and child.get() == initial_dir:
+                                                child.delete(0, tk.END)
+                                                child.insert(0, install_dir)
+                                                break
+                    except Exception as e:
+                        print(f"Error updating config window: {e}")
+                    
+                    status_label.config(text="Installation complete!")
+                    progress_dialog.after(1000, progress_dialog.destroy)
+                    
+                    # Show success message
+                    messagebox.showinfo("Download Complete", 
+                                      f"GW2 EI Log Combiner has been downloaded and installed to:\n{install_dir}",
+                                      parent=parent_window)
+                except Exception as e:
+                    messagebox.showerror("Extraction Error", 
+                                       f"Failed to extract the zip file: {str(e)}",
+                                       parent=progress_dialog)
+                    progress_dialog.destroy()
+            
+            progress_dialog.after(0, ask_directory)
+            
+        except Exception as e:
+            progress_dialog.after(0, lambda: messagebox.showerror("Download Error", 
+                                                             f"Failed to download GW2 EI Log Combiner: {str(e)}",
+                                                             parent=progress_dialog))
+            progress_dialog.after(100, progress_dialog.destroy)
+    
+    # Start the download thread
+    threading.Thread(target=download_thread, daemon=True).start()
 
 def validate_config():
     """Validate the required configuration values."""

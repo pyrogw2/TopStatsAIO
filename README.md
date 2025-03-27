@@ -7,18 +7,34 @@ Your one stop shop for generating top stats. This program uses both Elite Insigh
 The primary directive of this application is to increase the user friendliness of these tools. Key features:
 - Ability to easily select which logs you want to aggregate
 - Ability to set a static raid time and grab logs older than a start time
-- Automatically configures and uses both EliteInsightsParser and GW2EILogCombiner to generate the final `.json` to be used with TiddlyWiki.
+- Automatically configures and uses both EliteInsightsParser and GW2EILogCombiner to generate the final `.json` to be used with TiddlyWiki
+- Built-in downloader to automatically fetch the latest versions of required prerequisites
 
 ## Setup
-### 1. Download Elite Insights Parser
+### 1. Download Prerequisites
+You have two options for downloading the required prerequisites:
+
+#### Option A: Download prerequisites automatically through TopStatsAIO
+1. Run TopStatsAIO and click the "Config" button
+2. In the configuration window, use the "Download Prerequisites" section to automatically download:
+   - GW2EICLI (Elite Insights Parser) - downloads and extracts the latest release
+   - GW2 EI Log Combiner - downloads and extracts the latest prerelease
+3. By default, prerequisites are downloaded to a "prerequisites" folder in the application directory:
+   - Prerequisites/GW2EICLI - for the Elite Insights Parser
+   - Prerequisites/GW2_EI_log_combiner - for the GW2 EI Log Combiner
+4. You can choose a different location during the download process if preferred
+
+#### Option B: Download prerequisites manually
+**Elite Insights Parser:**
 https://github.com/baaron4/GW2-Elite-Insights-Parser/releases
-1. Be sure to download the `GW2EICLI.zip` file.
-2. Extract the folder and put it someplace you don't mind it staying.
-### 2. Download the GW2 EI Log Combiner
+1. Download the `GW2EICLI.zip` file
+2. Extract the folder somewhere convenient
+
+**GW2 EI Log Combiner:**
 https://github.com/Drevarr/GW2_EI_log_combiner/releases
-1. Be sure to download  `TopStats_v...zip`
-2. Extract the ZIP and put it someplace you don't mind it staying.
-### 3. Download the TopStatsAIO
+1. Download the `TopStats_v...zip` file
+2. Extract the ZIP somewhere convenient
+### 2. Download the TopStatsAIO
 1. Head to the Releases [TopStatsAIO Releases](https://github.com/darkharasho/TopStatsAIO/releases) and download the latest ZIP
 2. Extract the ZIP and put it someplace you don't mind it staying
 3. Run the TopStatsAIO.exe file
