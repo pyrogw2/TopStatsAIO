@@ -1034,16 +1034,25 @@ def download_gw2eicli(parent_window):
     progress_dialog.resizable(False, False)
     progress_dialog.transient(parent_window)
     progress_dialog.grab_set()  # Make the dialog modal
-    
+
+    # Apply the current theme to the progress dialog
+    selected_theme = config.get("theme", "dark")
+    if selected_theme == "dark":
+        progress_dialog.configure(bg="#333333")  # Dark background
+        label_fg = "#FFFFFF"  # White text
+    elif selected_theme == "light":
+        progress_dialog.configure(bg="#FFFFFF")  # Light background
+        label_fg = "#000000"  # Black text
+
     # Add status label
-    status_label = ttk.Label(progress_dialog, text="Fetching latest release information...")
+    status_label = ttk.Label(progress_dialog, text="Fetching latest release information...", foreground=label_fg)
     status_label.pack(pady=20)
-    
+
     # Add progress bar
     progress_bar = ttk.Progressbar(progress_dialog, orient="horizontal", length=350, mode="indeterminate")
     progress_bar.pack(pady=10)
     progress_bar.start()
-    
+
     def download_thread():
         try:
             # Step 1: Get the latest release information
@@ -1052,75 +1061,77 @@ def download_gw2eicli(parent_window):
             response = requests.get(api_url)
             response.raise_for_status()
             release_data = response.json()
-            
+
             # Step 2: Find the GW2EICLI.zip asset
             zip_asset = None
             for asset in release_data.get("assets", []):
                 if asset["name"] == "GW2EICLI.zip":
                     zip_asset = asset
                     break
-            
+
             if not zip_asset:
-                progress_dialog.after(0, lambda: messagebox.showerror("Download Error", 
-                                                                 "GW2EICLI.zip not found in the latest release",
-                                                                 parent=progress_dialog))
+                progress_dialog.after(0, lambda: messagebox.showerror(
+                    "Download Error",
+                    "GW2EICLI.zip not found in the latest release",
+                    parent=progress_dialog
+                ))
                 progress_dialog.after(100, progress_dialog.destroy)
                 return
-            
+
             # Step 3: Download the zip file
             status_label.config(text="Downloading GW2EICLI.zip...")
             download_url = zip_asset["browser_download_url"]
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
-            
+
             # Step 4: Ask user for installation directory
             progress_dialog.after(0, progress_bar.stop)
-            
+
             def ask_directory():
                 nonlocal progress_dialog
-                
+
                 # Create a dedicated downloads directory if it doesn't exist
                 downloads_dir = os.path.join(os.getcwd(), "prerequisites")
                 os.makedirs(downloads_dir, exist_ok=True)
-                
+
                 # Create a tool-specific directory
                 gw2eicli_dir = os.path.join(downloads_dir, "GW2EICLI")
                 os.makedirs(gw2eicli_dir, exist_ok=True)
-                
+
                 # Default to the dedicated directory, but allow user to choose
                 initial_dir = config.get("elite_insights_path", "") if os.path.exists(config.get("elite_insights_path", "")) else gw2eicli_dir
-                
+
                 # Ask if user wants to use the default directory
                 use_default = messagebox.askyesno(
                     "Installation Directory",
                     f"Do you want to install GW2EICLI to the default location?\n\n{gw2eicli_dir}",
                     parent=progress_dialog
                 )
-                
+
                 if use_default:
                     install_dir = gw2eicli_dir
                 else:
                     install_dir = filedialog.askdirectory(
-                        title="Select GW2EICLI Installation Directory", 
+                        title="Select GW2EICLI Installation Directory",
                         initialdir=initial_dir,
                         parent=progress_dialog
                     )
-                
+
                 if not install_dir:
                     progress_dialog.destroy()
                     return
-                
+
                 progress_bar.config(mode="determinate", maximum=100, value=0)
                 status_label.config(text="Extracting files...")
-                
+
                 # Step 5: Extract the zip file
                 try:
                     z = zipfile.ZipFile(io.BytesIO(response.content))
                     total_files = len(z.namelist())
-                    
+
                     # Create the directory if it doesn't exist
                     os.makedirs(install_dir, exist_ok=True)
-                    
+
                     # Extract all files
                     for i, file in enumerate(z.namelist()):
                         z.extract(file, install_dir)
@@ -1128,19 +1139,19 @@ def download_gw2eicli(parent_window):
                         progress_bar.config(value=progress)
                         status_label.config(text=f"Extracting: {progress}% complete")
                         progress_dialog.update()
-                    
+
                     # Step 6: Update the configuration
                     config["elite_insights_path"] = install_dir
-                    
+
                     # Save version information
                     if "prerequisites" not in config:
                         config["prerequisites"] = {}
-                    
+
                     config["prerequisites"]["GW2EICLI_version"] = release_data.get("tag_name", "unknown")
                     config["prerequisites"]["GW2EICLI_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
+
                     save_config()
-                    
+
                     # Update the entry field in the config window if it's open
                     try:
                         for widget in parent_window.winfo_children():
@@ -1154,28 +1165,34 @@ def download_gw2eicli(parent_window):
                                                 break
                     except Exception as e:
                         print(f"Error updating config window: {e}")
-                    
+
                     status_label.config(text="Installation complete!")
                     progress_dialog.after(1000, progress_dialog.destroy)
-                    
+
                     # Show success message
-                    messagebox.showinfo("Download Complete", 
-                                      f"GW2EICLI has been downloaded and installed to:\n{install_dir}",
-                                      parent=parent_window)
+                    messagebox.showinfo(
+                        "Download Complete",
+                        f"GW2EICLI has been downloaded and installed to:\n{install_dir}",
+                        parent=parent_window
+                    )
                 except Exception as e:
-                    messagebox.showerror("Extraction Error", 
-                                       f"Failed to extract the zip file: {str(e)}",
-                                       parent=progress_dialog)
+                    messagebox.showerror(
+                        "Extraction Error",
+                        f"Failed to extract the zip file: {str(e)}",
+                        parent=progress_dialog
+                    )
                     progress_dialog.destroy()
-            
+
             progress_dialog.after(0, ask_directory)
-            
+
         except Exception as e:
-            progress_dialog.after(0, lambda: messagebox.showerror("Download Error", 
-                                                             f"Failed to download GW2EICLI: {str(e)}",
-                                                             parent=progress_dialog))
+            progress_dialog.after(0, lambda: messagebox.showerror(
+                "Download Error",
+                f"Failed to download GW2EICLI: {str(e)}",
+                parent=progress_dialog
+            ))
             progress_dialog.after(100, progress_dialog.destroy)
-    
+
     # Start the download thread
     threading.Thread(target=download_thread, daemon=True).start()
 
@@ -1256,8 +1273,7 @@ def download_gw2_ei_log_combiner(parent_window):
                 os.makedirs(combiner_dir, exist_ok=True)
                 
                 # Default to the dedicated directory, but allow user to choose
-                initial_dir = config.get("top_stats_path", "") if os.path.exists(config.get("top_stats_path", "")) else combiner_dir
-                
+                initial_dir = config.get("top_stats_path", "") if os.path.exists(config.get("top_stats_path", "")) else combiner_dir                
                 # Ask if user wants to use the default directory
                 use_default = messagebox.askyesno(
                     "Installation Directory",
