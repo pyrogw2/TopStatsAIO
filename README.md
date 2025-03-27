@@ -27,8 +27,10 @@ https://github.com/Drevarr/GW2_EI_log_combiner/releases
 5. Hit the Config button on the bottom left
 ![image](https://github.com/user-attachments/assets/d45a4b0f-44f6-4ea1-8ada-0a0d0f3d0e3e)
 6. In the config window, set the Elite Insights Parser and GW2 EI Log Combiner values to wherever you saved it in steps 1 & 2
+
 ![image](https://github.com/user-attachments/assets/9d56eb2d-f04e-4acd-a5f7-4bea5859dd65)
-7. **OPTIONALLY**
+
+8. **OPTIONALLY**
    - You can set a `DPSReportUserToken` and `Default Hour` to allow for persistent DPS Report and default hour as your raid start time to allow for quick file selection
    - You can use this app with the older [Drevarr/arcdps_top_stats_parser](https://github.com/Drevarr/arcdps_top_stats_parser) by going to config and setting the folder path as well as toggling on the `top_stats_parser` option.
 
