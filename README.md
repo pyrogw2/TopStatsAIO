@@ -53,4 +53,7 @@ Navigate to the directory containing main.py and run the following command:
 ```bash
 pyinstaller --onefile --noconsole --name TopStatsAIO --distpath . --add-data "config.json;." --add-data "themes;themes" --icon "top-stats-aio.ico" main.py
 ```
-![image](https://github.com/user-attachments/assets/275b1f15-d12c-4ed2-a8be-116642bd7a61)
+## Recognition
+Thank you to the GW2 Analytics communinty and Drevarr specifically for helping create this. Shout out to my PAN friends for the excitement and eagerness to help test. Thank you Aza for inspiring me to finally write this UI! Huge thanks to Paralda for informing me of the latest and greatest
+<img src="https://github.com/user-attachments/assets/81650120-8d69-4259-90b0-f84ba5a8d986" width=300>
+
