@@ -465,7 +465,7 @@ def generate_aggregate():
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
 
-    # Define a custom style for the button
+# Define a custom style for the button
     style = ttk.Style()
     style.configure("Accent.TButton", background="#28a745", foreground="white", font=("Arial", 10, "bold"))
     style.configure("TButton", font=("Arial", 10))  # Default style for buttons
@@ -651,6 +651,27 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
             # Edit the .conf file to set OutLocation to the temporary folder
             edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
 
+            # Handle the top_stats_config.ini file
+            gw2_ei_log_combiner_config = os.path.join(os.getcwd(), "top_stats_config.ini")
+            edited_gw2_ei_log_combiner_config = os.path.join(temp_dir, "top_stats_config.ini")
+
+            if not os.path.exists(gw2_ei_log_combiner_config):
+                update_terminal_output(f"Error: Configuration template file not found: {gw2_ei_log_combiner_config}")
+                return
+            # Edit the top_stats_config.ini file
+            try:
+                edit_top_stats_config(
+                    gw2_ei_log_combiner_config,
+                    edited_gw2_ei_log_combiner_config,
+                    config.get("guild_name", ""),
+                    config.get("guild_id", ""),
+                    config.get("api_key", "")
+                )
+                update_terminal_output("Edited top_stats_config.ini with the provided settings.")
+            except Exception as e:
+                update_terminal_output(f"Error editing top_stats_config.ini: {e}")
+                return
+
             # Process .zevtc files using Elite Insights
             try:
                 update_terminal_output("Processing .zevtc files with Elite Insights...")
@@ -814,6 +835,25 @@ def edit_conf_file(template_path, output_path, temp_dir):
                     output_file.write(line)
     except Exception as e:
         print(f"Error editing .conf file: {e}")
+
+def edit_top_stats_config(template_path, output_path, guild_name, guild_id, api_key):
+    """Edit the top_stats_config.ini file with the provided settings."""
+    try:
+        with open(template_path, "r") as template_file:
+            lines = template_file.readlines()
+
+        with open(output_path, "w") as output_file:
+            for line in lines:
+                if line.startswith("guild_name = "):
+                    output_file.write(f"guild_name = {guild_name}\n")
+                elif line.startswith("guild_id = "):
+                    output_file.write(f"guild_id = {guild_id}\n")
+                elif line.startswith("api_key = "):
+                    output_file.write(f"api_key = {api_key}\n")
+                else:
+                    output_file.write(line)
+    except Exception as e:
+        print(f"Error editing top_stats_config.ini: {e}")
 
 config_window_instance = None  # Global variable to track the config window
 
