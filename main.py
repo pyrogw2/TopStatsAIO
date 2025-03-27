@@ -333,7 +333,7 @@ def on_tree_click(event):
 
                 # Determine the range of items
                 range_start = min(start_index, end_index)
-                range_end = max(start_index, range_end)
+                range_end = max(start_index, end_index)
 
                 # Check if the clicked item is selected or not
                 full_path = tree.item(item_id, "tags")[0]
