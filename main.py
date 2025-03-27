@@ -868,10 +868,13 @@ def edit_top_stats_config(template_path, output_path, guild_name, guild_id, api_
         print(f"Error editing top_stats_config.ini: {e}")
 
 config_window_instance = None  # Global variable to track the config window
+elite_entry = None  # Global variable for Elite Insights path entry
+top_stats_entry = None  # Global variable for Top Stats Parser path entry
+old_top_stats_entry = None  # Global variable for old Top Stats Parser path entry
 
 def open_config_window():
     """Open the configuration popup window."""
-    global config_window_instance
+    global config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry
 
     if config_window_instance and tk.Toplevel.winfo_exists(config_window_instance):
         # If the window is already open, bring it to the front
@@ -931,6 +934,8 @@ def open_config_window():
     elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=lambda: browse_folder(elite_entry))
     elite_button.pack(side="left", padx=5)
 
+    global elite_entry, top_stats_entry, old_top_stats_entry
+    
     elite_entry = ttk.Entry(elite_frame, width=50)
     elite_entry.insert(0, config.get("elite_insights_path", ""))
     elite_entry.pack(side="left", padx=10)
@@ -1258,7 +1263,7 @@ def download_gw2eicli(parent_window):
                         status_label.config(text=f"Extracting: {progress}% complete")
                         progress_dialog.update()
 
-                    # Step 6: Update the configuration
+                    # Step 6: Update the configuration with the new path
                     config["elite_insights_path"] = install_dir
 
                     # Save version information
@@ -1269,20 +1274,9 @@ def download_gw2eicli(parent_window):
                     config["prerequisites"]["GW2EICLI_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     save_config()
-
-                    # Update the entry field in the config window if it's open
-                    try:
-                        for widget in parent_window.winfo_children():
-                            if isinstance(widget, ttk.LabelFrame) and widget.winfo_children():
-                                for frame in widget.winfo_children():
-                                    if isinstance(frame, ttk.Frame):
-                                        for child in frame.winfo_children():
-                                            if isinstance(child, ttk.Entry) and child.get() == initial_dir:
-                                                child.delete(0, tk.END)
-                                                child.insert(0, install_dir)
-                                                break
-                    except Exception as e:
-                        print(f"Error updating config window: {e}")
+                    
+                    # Update the UI if the config window is open
+                    update_config_window_entries("elite_insights_path", install_dir)
 
                     status_label.config(text="Installation complete!")
                     progress_dialog.after(1000, progress_dialog.destroy)
@@ -1290,7 +1284,7 @@ def download_gw2eicli(parent_window):
                     # Show success message
                     messagebox.showinfo(
                         "Download Complete",
-                        f"GW2EICLI has been downloaded and installed to:\n{install_dir}",
+                        f"GW2EICLI has been downloaded and installed to:\n{install_dir}\n\nThe application configuration has been automatically updated to use this path.",
                         parent=parent_window
                     )
                 except Exception as e:
@@ -1444,7 +1438,7 @@ def download_gw2_ei_log_combiner(parent_window):
                         status_label.config(text=f"Extracting: {progress}% complete")
                         progress_dialog.update()
 
-                    # Step 6: Update the configuration
+                    # Step 6: Update the configuration with the new path
                     config["top_stats_path"] = install_dir
 
                     # Save version information
@@ -1455,20 +1449,9 @@ def download_gw2_ei_log_combiner(parent_window):
                     config["prerequisites"]["GW2_EI_log_combiner_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     save_config()
-
-                    # Update the entry field in the config window if it's open
-                    try:
-                        for widget in parent_window.winfo_children():
-                            if isinstance(widget, ttk.LabelFrame) and widget.winfo_children():
-                                for frame in widget.winfo_children():
-                                    if isinstance(frame, ttk.Frame):
-                                        for child in frame.winfo_children():
-                                            if isinstance(child, ttk.Entry) and child.get() == initial_dir:
-                                                child.delete(0, tk.END)
-                                                child.insert(0, install_dir)
-                                                break
-                    except Exception as e:
-                        print(f"Error updating config window: {e}")
+                    
+                    # Update the UI if the config window is open
+                    update_config_window_entries("top_stats_path", install_dir)
 
                     status_label.config(text="Installation complete!")
                     progress_dialog.after(1000, progress_dialog.destroy)
@@ -1476,7 +1459,7 @@ def download_gw2_ei_log_combiner(parent_window):
                     # Show success message
                     messagebox.showinfo(
                         "Download Complete",
-                        f"GW2 EI Log Combiner has been downloaded and installed to:\n{install_dir}",
+                        f"GW2 EI Log Combiner has been downloaded and installed to:\n{install_dir}\n\nThe application configuration has been automatically updated to use this path.",
                         parent=parent_window
                     )
                 except Exception as e:
@@ -1499,6 +1482,40 @@ def download_gw2_ei_log_combiner(parent_window):
 
     # Start the download thread
     threading.Thread(target=download_thread, daemon=True).start()
+
+def update_config_window_entries(field_name, value):
+    """Update entry fields in the config window if it's open."""
+    global config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry
+    
+    # If the config window is not open, return
+    if not config_window_instance or not tk.Toplevel.winfo_exists(config_window_instance):
+        return
+    
+    print(f"Updating {field_name} to {value}")
+        
+    # Use the global entry references directly - these are much more reliable than traversing the widget tree
+    if field_name == "elite_insights_path":
+        config_window_instance.after(0, lambda: _update_entry_directly(elite_entry, value))
+    elif field_name == "top_stats_path":
+        config_window_instance.after(0, lambda: _update_entry_directly(top_stats_entry, value))
+    elif field_name == "old_top_stats_path":
+        config_window_instance.after(0, lambda: _update_entry_directly(old_top_stats_entry, value))
+    
+def _update_entry_directly(entry_variable, value):
+    """Helper function to update an entry widget directly by reference."""
+    try:
+        if entry_variable and isinstance(entry_variable, ttk.Entry):
+            # Clear the entry field
+            entry_variable.delete(0, tk.END)
+            # Insert the new value
+            entry_variable.insert(0, value)
+            # Force focus to update the widget
+            entry_variable.focus_set()
+            # Then remove focus to "commit" the change
+            entry_variable.master.focus_set()
+            print(f"Updated entry to: {value}")
+    except Exception as e:
+        print(f"Error directly updating entry: {e}")
 
 def validate_config():
     """Validate the required configuration values."""
