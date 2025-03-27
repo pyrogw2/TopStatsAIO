@@ -507,9 +507,6 @@ def generate_aggregate():
                 update_terminal_output(f"Unknown parser selection: {parser_selection}")
         except Exception as e:
             update_terminal_output(f"Unexpected error: {e}")
-        finally:
-            # Enable the "Open Folder" button after processing is complete
-            enable_open_folder_button()
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
