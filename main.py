@@ -28,7 +28,8 @@ def load_config():
         "top_stats_path": "",
         "default_time": "",  # Not needed anymore
         "default_hour": 12,  # Default to 12:00 PM
-        "default_minute": 0
+        "default_minute": 0,
+        "theme": "dark"  # Default theme is dark
     }
 
 # Save config to file
@@ -44,6 +45,16 @@ def get_default_time():
     default_hour = config.get("default_hour", 12)
     default_minute = config.get("default_minute", 0)
     return today.replace(hour=default_hour, minute=default_minute, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M")
+
+def apply_theme():
+    """Apply the selected theme to the app."""
+    selected_theme = config.get("theme", "dark")
+    if selected_theme == "dark":
+        ttk.Style().theme_use("forest-dark")
+        root.configure(bg="#333333")  # Dark background
+    elif selected_theme == "light":
+        ttk.Style().theme_use("forest-light")
+        root.configure(bg="#FFFFFF")  # Light background
 
 # Choose root folder
 def choose_root_folder():
@@ -146,8 +157,14 @@ if os.path.exists(forest_dark_path):
 if os.path.exists(forest_light_path):
     root.tk.call("source", forest_light_path)
 
-# Apply the Forest theme (choose "forest-dark" or "forest-light")
-ttk.Style().theme_use("forest-dark")  # Use "forest-dark" for dark mode or "forest-light" for light mode
+# Apply the selected theme
+selected_theme = config.get("theme", "dark")
+if selected_theme == "dark":
+    ttk.Style().theme_use("forest-dark")
+    root.configure(bg="#333333")  # Dark background
+elif selected_theme == "light":
+    ttk.Style().theme_use("forest-light")
+    root.configure(bg="#FFFFFF")  # Light background
 
 # Set the application icon
 icon_path = os.path.join(os.getcwd(), "top-stats-aio.ico")
@@ -804,9 +821,16 @@ def open_config_window():
     # Create the configuration window
     config_window_instance = Toplevel(root)
     config_window_instance.title("Configuration")
-    config_window_instance.geometry("500x500")
+    config_window_instance.geometry("500x700")
     config_window_instance.resizable(False, False)
     config_window_instance.configure(bg="#333333")  # Match the Forest theme's dark background color
+
+    # Set the background color based on the selected theme
+    selected_theme = config.get("theme", "dark")
+    if selected_theme == "dark":
+        config_window_instance.configure(bg="#333333")  # Dark background
+    elif selected_theme == "light":
+        config_window_instance.configure(bg="#FFFFFF")  # Light background
 
     # Configuration frame
     top_buttons_frame = ttk.LabelFrame(config_window_instance, text="Configuration", padding=10)
@@ -887,9 +911,21 @@ def open_config_window():
     minute_entry.insert(0, config.get("default_minute", 0))
     minute_entry.pack(side="left", padx=5)
 
+    # Theme Selection
+    theme_frame = ttk.LabelFrame(top_buttons_frame, text="Theme Selection", padding=10)
+    theme_frame.pack(fill="x", pady=10)
+
+    theme_selection = tk.StringVar(value=config.get("theme", "dark"))
+
+    dark_theme_radio = ttk.Radiobutton(theme_frame, text="Dark Theme", variable=theme_selection, value="dark")
+    dark_theme_radio.pack(anchor="w", padx=5)
+
+    light_theme_radio = ttk.Radiobutton(theme_frame, text="Light Theme", variable=theme_selection, value="light")
+    light_theme_radio.pack(anchor="w", padx=5)
+
     # Save Button
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
-        config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection))
+        config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection))
     save_button.pack(anchor="e", padx=10, pady=10)
 
     # Handle window close event
@@ -914,7 +950,7 @@ def browse_folder(entry_widget):
     if config_window_instance:
         config_window_instance.lift()
 
-def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection):
+def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection):
     """Save the changes and close the configuration popup."""
     elite_path = elite_entry.get()
     top_stats_path = top_stats_entry.get()
@@ -956,12 +992,16 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_s
     config["default_hour"] = hour
     config["default_minute"] = minute
     config["parser_selection"] = parser_selection.get()  # Save the parser selection
+    config["theme"] = theme_selection.get()  # Save the selected theme
     save_config()
 
     # Update the default time in the main window
     new_default_time = get_default_time()
     date_entry.delete(0, tk.END)
     date_entry.insert(0, new_default_time)
+
+    # Apply the new theme immediately
+    apply_theme()
 
     config_window.destroy()  # Close the configuration popup
 
