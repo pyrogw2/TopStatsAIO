@@ -156,9 +156,9 @@ forest_dark_path = os.path.join(themes_dir, "forest-dark.tcl")
 forest_light_path = os.path.join(themes_dir, "forest-light.tcl")
 
 # Check if the theme files exist
-if os.path.exists(forest_dark_path):
+if (os.path.exists(forest_dark_path)):
     root.tk.call("source", forest_dark_path)
-if os.path.exists(forest_light_path):
+if (os.path.exists(forest_light_path)):
     root.tk.call("source", forest_light_path)
 
 # Apply the selected theme
@@ -198,6 +198,12 @@ main_frame = ttk.LabelFrame(root, text="File Selection", padding=10)
 main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 main_frame.rowconfigure(0, weight=1)
 main_frame.columnconfigure(0, weight=1)
+# Set a default starting size for the main window
+root.geometry("1200x900")  # Width x Height
+
+# Allow the window to be resizable
+root.resizable(True, True)
+main_frame.grid_propagate(False)
 
 # Treeview container frame
 tree_frame = ttk.Frame(main_frame)
@@ -465,7 +471,7 @@ def generate_aggregate():
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
 
-    # Define a custom style for the button
+# Define a custom style for the button
     style = ttk.Style()
     style.configure("Accent.TButton", background="#28a745", foreground="white", font=("Arial", 10, "bold"))
     style.configure("TButton", font=("Arial", 10))  # Default style for buttons
@@ -651,6 +657,27 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
             # Edit the .conf file to set OutLocation to the temporary folder
             edit_conf_file(template_conf_file, edited_conf_file, temp_dir)
 
+            # Handle the top_stats_config.ini file
+            gw2_ei_log_combiner_config = os.path.join(os.getcwd(), "top_stats_config.ini")
+            edited_gw2_ei_log_combiner_config = os.path.join(temp_dir, "top_stats_config.ini")
+
+            if not os.path.exists(gw2_ei_log_combiner_config):
+                update_terminal_output(f"Error: Configuration template file not found: {gw2_ei_log_combiner_config}")
+                return
+            # Edit the top_stats_config.ini file
+            try:
+                edit_top_stats_config(
+                    gw2_ei_log_combiner_config,
+                    edited_gw2_ei_log_combiner_config,
+                    config.get("guild_name", ""),
+                    config.get("guild_id", ""),
+                    config.get("api_key", "")
+                )
+                update_terminal_output("Edited top_stats_config.ini with the provided settings.")
+            except Exception as e:
+                update_terminal_output(f"Error editing top_stats_config.ini: {e}")
+                return
+
             # Process .zevtc files using Elite Insights
             try:
                 update_terminal_output("Processing .zevtc files with Elite Insights...")
@@ -717,12 +744,18 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
         try:
             top_stats_exe = os.path.join(config.get("top_stats_path", ""), "TopStats.exe")
             processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
+            top_stats_config_path = os.path.join(temp_dir, "top_stats_config.ini")  # Path to the edited config file
 
             if not os.path.exists(top_stats_exe):
                 update_terminal_output(f"Error: TopStats.exe not found at {top_stats_exe}")
                 return
 
-            command = [top_stats_exe, "-i", processed_folder_path]
+            if not os.path.exists(top_stats_config_path):
+                update_terminal_output(f"Error: top_stats_config.ini not found at {top_stats_config_path}")
+                return
+
+            # Add the -c flag with the path to the top_stats_config.ini file
+            command = [top_stats_exe, "-i", processed_folder_path, "-c", top_stats_config_path]
             update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
 
             # Run the command and wait for it to complete
@@ -815,6 +848,25 @@ def edit_conf_file(template_path, output_path, temp_dir):
     except Exception as e:
         print(f"Error editing .conf file: {e}")
 
+def edit_top_stats_config(template_path, output_path, guild_name, guild_id, api_key):
+    """Edit the top_stats_config.ini file with the provided settings."""
+    try:
+        with open(template_path, "r") as template_file:
+            lines = template_file.readlines()
+
+        with open(output_path, "w") as output_file:
+            for line in lines:
+                if line.startswith("guild_name = "):
+                    output_file.write(f"guild_name = {guild_name}\n")
+                elif line.startswith("guild_id = "):
+                    output_file.write(f"guild_id = {guild_id}\n")
+                elif line.startswith("api_key = "):
+                    output_file.write(f"api_key = {api_key}\n")
+                else:
+                    output_file.write(line)
+    except Exception as e:
+        print(f"Error editing top_stats_config.ini: {e}")
+
 config_window_instance = None  # Global variable to track the config window
 
 def open_config_window():
@@ -829,7 +881,7 @@ def open_config_window():
     # Create the configuration window
     config_window_instance = Toplevel(root)
     config_window_instance.title("Configuration")
-    config_window_instance.geometry("500x700")
+    config_window_instance.geometry("950x750")  # Adjust width for two columns
     config_window_instance.resizable(False, False)
     config_window_instance.configure(bg="#333333")  # Match the Forest theme's dark background color
 
@@ -840,24 +892,40 @@ def open_config_window():
     elif selected_theme == "light":
         config_window_instance.configure(bg="#FFFFFF")  # Light background
 
+    # Create a frame for the two-column layout
+    content_frame = ttk.Frame(config_window_instance, padding=10)
+    content_frame.pack(fill="both", expand=True)
+
+    # Create two columns
+    left_column = ttk.Frame(content_frame)
+    left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  # Add padding between columns
+
+    right_column = ttk.Frame(content_frame)
+    right_column.grid(row=0, column=1, sticky="nsew")
+
+    # Configure column weights
+    content_frame.columnconfigure(0, weight=6)
+    content_frame.columnconfigure(1, weight=1)
+
+    # Add settings to the left column
     # Download prerequisites frame
-    download_frame = ttk.LabelFrame(config_window_instance, text="Download Prerequisites", padding=10)
-    download_frame.pack(fill="both", expand=False, padx=10, pady=10)
-    
-    gw2eicli_button = ttk.Button(download_frame, text="Download Latest GW2EICLI", 
+    download_frame = ttk.LabelFrame(left_column, text="Download Prerequisites", padding=10)
+    download_frame.pack(fill="x", pady=10)
+
+    gw2eicli_button = ttk.Button(download_frame, text="Download Latest GW2EICLI",
                                  command=lambda: download_gw2eicli(config_window_instance))
     gw2eicli_button.pack(fill="x", pady=5)
-    
-    combiner_button = ttk.Button(download_frame, text="Download Latest GW2 EI Log Combiner", 
-                                command=lambda: download_gw2_ei_log_combiner(config_window_instance))
+
+    combiner_button = ttk.Button(download_frame, text="Download Latest GW2 EI Log Combiner",
+                                 command=lambda: download_gw2_ei_log_combiner(config_window_instance))
     combiner_button.pack(fill="x", pady=5)
-    
-    # Configuration frame
-    top_buttons_frame = ttk.LabelFrame(config_window_instance, text="Configuration", padding=10)
-    top_buttons_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # Set up Paths frame
+    folder_selector_frame = ttk.LabelFrame(left_column, text="Set Paths", padding=10)
+    folder_selector_frame.pack(fill="x", pady=10)
 
     # Elite Insights Folder
-    elite_frame = ttk.Frame(top_buttons_frame)
+    elite_frame = ttk.Frame(folder_selector_frame)
     elite_frame.pack(fill="x", pady=5)
 
     elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=lambda: browse_folder(elite_entry))
@@ -868,7 +936,7 @@ def open_config_window():
     elite_entry.pack(side="left", padx=10)
 
     # Top Stats Parser Folder
-    top_stats_frame = ttk.Frame(top_buttons_frame)
+    top_stats_frame = ttk.Frame(folder_selector_frame)
     top_stats_frame.pack(fill="x", pady=5)
 
     top_stats_button = ttk.Button(top_stats_frame, text="Set Top Stats Parser Folder", command=lambda: browse_folder(top_stats_entry))
@@ -879,7 +947,7 @@ def open_config_window():
     top_stats_entry.pack(side="left", padx=10)
 
     # (OLD) Top Stats Parser Folder
-    old_top_stats_frame = ttk.Frame(top_buttons_frame)
+    old_top_stats_frame = ttk.Frame(folder_selector_frame)
     old_top_stats_frame.pack(fill="x", pady=5)
 
     old_top_stats_button = ttk.Button(old_top_stats_frame, text="Set (OLD) Top Stats Parser Folder", command=lambda: browse_folder(old_top_stats_entry))
@@ -889,21 +957,12 @@ def open_config_window():
     old_top_stats_entry.insert(0, config.get("old_top_stats_path", ""))
     old_top_stats_entry.pack(side="left", padx=10)
 
-    # Radio Button for Parser Selection
-    parser_selection_frame = ttk.LabelFrame(top_buttons_frame, text="Parser Selection", padding=10)
-    parser_selection_frame.pack(fill="x", pady=10)
-
-    # Set the default value to "GW2_EI_log_combiner"
-    parser_selection = tk.StringVar(value=config.get("parser_selection", "GW2_EI_log_combiner"))
-
-    arcdps_radio = ttk.Radiobutton(parser_selection_frame, text="arcdps_top_stats_parser", variable=parser_selection, value="arcdps_top_stats_parser")
-    arcdps_radio.pack(anchor="w", padx=5)
-
-    gw2_ei_radio = ttk.Radiobutton(parser_selection_frame, text="GW2_EI_log_combiner", variable=parser_selection, value="GW2_EI_log_combiner")
-    gw2_ei_radio.pack(anchor="w", padx=5)
+    # Set up Configs Frame
+    config_frame = ttk.LabelFrame(left_column, text="Set Optional Configuration", padding=10)
+    config_frame.pack(fill="x", pady=10)
 
     # DPSReportUserToken
-    token_frame = ttk.Frame(top_buttons_frame)
+    token_frame = ttk.Frame(config_frame)
     token_frame.pack(fill="x", pady=5)
 
     token_label = ttk.Label(token_frame, text="DPSReportUserToken:")
@@ -914,7 +973,7 @@ def open_config_window():
     token_entry.pack(side="left", padx=10)
 
     # Default Hour and Minute
-    time_frame = ttk.Frame(top_buttons_frame)
+    time_frame = ttk.Frame(config_frame)
     time_frame.pack(fill="x", pady=5)
 
     hour_label = ttk.Label(time_frame, text="Default Hour (0-23):")
@@ -931,8 +990,58 @@ def open_config_window():
     minute_entry.insert(0, config.get("default_minute", 0))
     minute_entry.pack(side="left", padx=5)
 
+    # Add a new frame for GW2 EI Log Combiner Settings
+    combiner_settings_frame = ttk.LabelFrame(left_column, text="GW2 EI Log Combiner Settings", padding=10)
+    combiner_settings_frame.pack(fill="x", padx=(5, 15), pady=10)  # Reduce left padding and add right padding
+
+    # Guild Name
+    guild_name_frame = ttk.Frame(combiner_settings_frame)
+    guild_name_frame.pack(fill="x", pady=5)
+
+    guild_name_label = ttk.Label(guild_name_frame, text="Guild Name:")
+    guild_name_label.pack(side="left", padx=5)
+
+    guild_name_entry = ttk.Entry(guild_name_frame, width=50)
+    guild_name_entry.insert(0, config.get("guild_name", ""))  # Load saved value or default to empty
+    guild_name_entry.pack(side="left", padx=10)
+
+    # Guild ID
+    guild_id_frame = ttk.Frame(combiner_settings_frame)
+    guild_id_frame.pack(fill="x", pady=5)
+
+    guild_id_label = ttk.Label(guild_id_frame, text="Guild ID:")
+    guild_id_label.pack(side="left", padx=5)
+
+    guild_id_entry = ttk.Entry(guild_id_frame, width=50)
+    guild_id_entry.insert(0, config.get("guild_id", ""))  # Load saved value or default to empty
+    guild_id_entry.pack(side="left", padx=10)
+
+    # API Key
+    api_key_frame = ttk.Frame(combiner_settings_frame)
+    api_key_frame.pack(fill="x", pady=5)
+
+    api_key_label = ttk.Label(api_key_frame, text="API Key:")
+    api_key_label.pack(side="left", padx=5)
+
+    api_key_entry = ttk.Entry(api_key_frame, width=50, show="*")  # Mask the API key for privacy
+    api_key_entry.insert(0, config.get("api_key", ""))  # Load saved value or default to empty
+    api_key_entry.pack(side="left", padx=10)
+
+    # Add settings to the right column
+    # Parser Selection
+    parser_selection_frame = ttk.LabelFrame(right_column, text="Parser Selection", padding=10)
+    parser_selection_frame.pack(fill="x", pady=10)
+
+    parser_selection = tk.StringVar(value=config.get("parser_selection", "GW2_EI_log_combiner"))
+
+    arcdps_radio = ttk.Radiobutton(parser_selection_frame, text="arcdps_top_stats_parser", variable=parser_selection, value="arcdps_top_stats_parser")
+    arcdps_radio.pack(anchor="w", padx=5)
+
+    gw2_ei_radio = ttk.Radiobutton(parser_selection_frame, text="GW2_EI_log_combiner", variable=parser_selection, value="GW2_EI_log_combiner")
+    gw2_ei_radio.pack(anchor="w", padx=5)
+
     # Theme Selection
-    theme_frame = ttk.LabelFrame(top_buttons_frame, text="Theme Selection", padding=10)
+    theme_frame = ttk.LabelFrame(right_column, text="Theme Selection", padding=10)
     theme_frame.pack(fill="x", pady=10)
 
     theme_selection = tk.StringVar(value=config.get("theme", "dark"))
@@ -943,19 +1052,21 @@ def open_config_window():
     light_theme_radio = ttk.Radiobutton(theme_frame, text="Light Theme", variable=theme_selection, value="light")
     light_theme_radio.pack(anchor="w", padx=5)
 
-    # Save Button
+    # Add the save button at the bottom, spanning both columns
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
-        config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection))
+        config_window_instance, 
+        elite_entry, 
+        top_stats_entry, 
+        old_top_stats_entry, 
+        token_entry, 
+        hour_entry, 
+        minute_entry, 
+        parser_selection, 
+        theme_selection,
+        guild_id_entry,
+        guild_name_entry,
+        api_key_entry))
     save_button.pack(anchor="e", padx=10, pady=10)
-
-    # Handle window close event
-    def on_close():
-        global config_window_instance
-        if config_window_instance:
-            config_window_instance.destroy()  # Destroy the window first
-            config_window_instance = None  # Reset the instance when the window is closed
-
-    config_window_instance.protocol("WM_DELETE_WINDOW", on_close)
 
 def browse_folder(entry_widget):
     """Open a folder dialog and set the selected path in the entry widget."""
@@ -970,7 +1081,7 @@ def browse_folder(entry_widget):
     if config_window_instance:
         config_window_instance.lift()
 
-def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection):
+def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection, guild_id_entry, guild_name_entry, api_key_entry):
     """Save the changes and close the configuration popup."""
     elite_path = elite_entry.get()
     top_stats_path = top_stats_entry.get()
@@ -1013,6 +1124,13 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_s
     config["default_minute"] = minute
     config["parser_selection"] = parser_selection.get()  # Save the parser selection
     config["theme"] = theme_selection.get()  # Save the selected theme
+
+    # Save the new GW2 EI Log Combiner settings
+    config["guild_name"] = guild_name_entry.get()
+    config["guild_id"] = guild_id_entry.get()
+    config["api_key"] = api_key_entry.get()
+
+    # Save the configuration to the config.json file
     save_config()
 
     # Update the default time in the main window
