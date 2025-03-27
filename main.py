@@ -156,9 +156,9 @@ forest_dark_path = os.path.join(themes_dir, "forest-dark.tcl")
 forest_light_path = os.path.join(themes_dir, "forest-light.tcl")
 
 # Check if the theme files exist
-if os.path.exists(forest_dark_path):
+if (os.path.exists(forest_dark_path)):
     root.tk.call("source", forest_dark_path)
-if os.path.exists(forest_light_path):
+if (os.path.exists(forest_light_path)):
     root.tk.call("source", forest_light_path)
 
 # Apply the selected theme
@@ -829,7 +829,7 @@ def open_config_window():
     # Create the configuration window
     config_window_instance = Toplevel(root)
     config_window_instance.title("Configuration")
-    config_window_instance.geometry("500x700")
+    config_window_instance.geometry("950x750")  # Adjust width for two columns
     config_window_instance.resizable(False, False)
     config_window_instance.configure(bg="#333333")  # Match the Forest theme's dark background color
 
@@ -840,24 +840,40 @@ def open_config_window():
     elif selected_theme == "light":
         config_window_instance.configure(bg="#FFFFFF")  # Light background
 
+    # Create a frame for the two-column layout
+    content_frame = ttk.Frame(config_window_instance, padding=10)
+    content_frame.pack(fill="both", expand=True)
+
+    # Create two columns
+    left_column = ttk.Frame(content_frame)
+    left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))  # Add padding between columns
+
+    right_column = ttk.Frame(content_frame)
+    right_column.grid(row=0, column=1, sticky="nsew")
+
+    # Configure column weights
+    content_frame.columnconfigure(0, weight=6)
+    content_frame.columnconfigure(1, weight=1)
+
+    # Add settings to the left column
     # Download prerequisites frame
-    download_frame = ttk.LabelFrame(config_window_instance, text="Download Prerequisites", padding=10)
-    download_frame.pack(fill="both", expand=False, padx=10, pady=10)
-    
-    gw2eicli_button = ttk.Button(download_frame, text="Download Latest GW2EICLI", 
+    download_frame = ttk.LabelFrame(left_column, text="Download Prerequisites", padding=10)
+    download_frame.pack(fill="x", pady=10)
+
+    gw2eicli_button = ttk.Button(download_frame, text="Download Latest GW2EICLI",
                                  command=lambda: download_gw2eicli(config_window_instance))
     gw2eicli_button.pack(fill="x", pady=5)
-    
-    combiner_button = ttk.Button(download_frame, text="Download Latest GW2 EI Log Combiner", 
-                                command=lambda: download_gw2_ei_log_combiner(config_window_instance))
+
+    combiner_button = ttk.Button(download_frame, text="Download Latest GW2 EI Log Combiner",
+                                 command=lambda: download_gw2_ei_log_combiner(config_window_instance))
     combiner_button.pack(fill="x", pady=5)
-    
-    # Configuration frame
-    top_buttons_frame = ttk.LabelFrame(config_window_instance, text="Configuration", padding=10)
-    top_buttons_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # Set up Paths frame
+    folder_selector_frame = ttk.LabelFrame(left_column, text="Set Paths", padding=10)
+    folder_selector_frame.pack(fill="x", pady=10)
 
     # Elite Insights Folder
-    elite_frame = ttk.Frame(top_buttons_frame)
+    elite_frame = ttk.Frame(folder_selector_frame)
     elite_frame.pack(fill="x", pady=5)
 
     elite_button = ttk.Button(elite_frame, text="Set Elite Insights Folder", command=lambda: browse_folder(elite_entry))
@@ -868,7 +884,7 @@ def open_config_window():
     elite_entry.pack(side="left", padx=10)
 
     # Top Stats Parser Folder
-    top_stats_frame = ttk.Frame(top_buttons_frame)
+    top_stats_frame = ttk.Frame(folder_selector_frame)
     top_stats_frame.pack(fill="x", pady=5)
 
     top_stats_button = ttk.Button(top_stats_frame, text="Set Top Stats Parser Folder", command=lambda: browse_folder(top_stats_entry))
@@ -879,7 +895,7 @@ def open_config_window():
     top_stats_entry.pack(side="left", padx=10)
 
     # (OLD) Top Stats Parser Folder
-    old_top_stats_frame = ttk.Frame(top_buttons_frame)
+    old_top_stats_frame = ttk.Frame(folder_selector_frame)
     old_top_stats_frame.pack(fill="x", pady=5)
 
     old_top_stats_button = ttk.Button(old_top_stats_frame, text="Set (OLD) Top Stats Parser Folder", command=lambda: browse_folder(old_top_stats_entry))
@@ -889,21 +905,12 @@ def open_config_window():
     old_top_stats_entry.insert(0, config.get("old_top_stats_path", ""))
     old_top_stats_entry.pack(side="left", padx=10)
 
-    # Radio Button for Parser Selection
-    parser_selection_frame = ttk.LabelFrame(top_buttons_frame, text="Parser Selection", padding=10)
-    parser_selection_frame.pack(fill="x", pady=10)
-
-    # Set the default value to "GW2_EI_log_combiner"
-    parser_selection = tk.StringVar(value=config.get("parser_selection", "GW2_EI_log_combiner"))
-
-    arcdps_radio = ttk.Radiobutton(parser_selection_frame, text="arcdps_top_stats_parser", variable=parser_selection, value="arcdps_top_stats_parser")
-    arcdps_radio.pack(anchor="w", padx=5)
-
-    gw2_ei_radio = ttk.Radiobutton(parser_selection_frame, text="GW2_EI_log_combiner", variable=parser_selection, value="GW2_EI_log_combiner")
-    gw2_ei_radio.pack(anchor="w", padx=5)
+    # Set up Configs Frame
+    config_frame = ttk.LabelFrame(left_column, text="Set Optional Configuration", padding=10)
+    config_frame.pack(fill="x", pady=10)
 
     # DPSReportUserToken
-    token_frame = ttk.Frame(top_buttons_frame)
+    token_frame = ttk.Frame(config_frame)
     token_frame.pack(fill="x", pady=5)
 
     token_label = ttk.Label(token_frame, text="DPSReportUserToken:")
@@ -914,7 +921,7 @@ def open_config_window():
     token_entry.pack(side="left", padx=10)
 
     # Default Hour and Minute
-    time_frame = ttk.Frame(top_buttons_frame)
+    time_frame = ttk.Frame(config_frame)
     time_frame.pack(fill="x", pady=5)
 
     hour_label = ttk.Label(time_frame, text="Default Hour (0-23):")
@@ -931,21 +938,9 @@ def open_config_window():
     minute_entry.insert(0, config.get("default_minute", 0))
     minute_entry.pack(side="left", padx=5)
 
-    # Theme Selection
-    theme_frame = ttk.LabelFrame(top_buttons_frame, text="Theme Selection", padding=10)
-    theme_frame.pack(fill="x", pady=10)
-
-    theme_selection = tk.StringVar(value=config.get("theme", "dark"))
-
-    dark_theme_radio = ttk.Radiobutton(theme_frame, text="Dark Theme", variable=theme_selection, value="dark")
-    dark_theme_radio.pack(anchor="w", padx=5)
-
-    light_theme_radio = ttk.Radiobutton(theme_frame, text="Light Theme", variable=theme_selection, value="light")
-    light_theme_radio.pack(anchor="w", padx=5)
-
     # Add a new frame for GW2 EI Log Combiner Settings
-    combiner_settings_frame = ttk.LabelFrame(config_window_instance, text="GW2 EI Log Combiner Settings", padding=10)
-    combiner_settings_frame.pack(fill="both", expand=False, padx=10, pady=10)
+    combiner_settings_frame = ttk.LabelFrame(left_column, text="GW2 EI Log Combiner Settings", padding=10)
+    combiner_settings_frame.pack(fill="x", padx=(5, 15), pady=10)  # Reduce left padding and add right padding
 
     # Guild Name
     guild_name_frame = ttk.Frame(combiner_settings_frame)
@@ -980,19 +975,35 @@ def open_config_window():
     api_key_entry.insert(0, config.get("api_key", ""))  # Load saved value or default to empty
     api_key_entry.pack(side="left", padx=10)
 
-    # Save Button
+    # Add settings to the right column
+    # Parser Selection
+    parser_selection_frame = ttk.LabelFrame(right_column, text="Parser Selection", padding=10)
+    parser_selection_frame.pack(fill="x", pady=10)
+
+    parser_selection = tk.StringVar(value=config.get("parser_selection", "GW2_EI_log_combiner"))
+
+    arcdps_radio = ttk.Radiobutton(parser_selection_frame, text="arcdps_top_stats_parser", variable=parser_selection, value="arcdps_top_stats_parser")
+    arcdps_radio.pack(anchor="w", padx=5)
+
+    gw2_ei_radio = ttk.Radiobutton(parser_selection_frame, text="GW2_EI_log_combiner", variable=parser_selection, value="GW2_EI_log_combiner")
+    gw2_ei_radio.pack(anchor="w", padx=5)
+
+    # Theme Selection
+    theme_frame = ttk.LabelFrame(right_column, text="Theme Selection", padding=10)
+    theme_frame.pack(fill="x", pady=10)
+
+    theme_selection = tk.StringVar(value=config.get("theme", "dark"))
+
+    dark_theme_radio = ttk.Radiobutton(theme_frame, text="Dark Theme", variable=theme_selection, value="dark")
+    dark_theme_radio.pack(anchor="w", padx=5)
+
+    light_theme_radio = ttk.Radiobutton(theme_frame, text="Light Theme", variable=theme_selection, value="light")
+    light_theme_radio.pack(anchor="w", padx=5)
+
+    # Add the save button at the bottom, spanning both columns
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
-        config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection))
+        config_window_instance, elite_entry, top_stats_entry, None, None, None, None, parser_selection, theme_selection))
     save_button.pack(anchor="e", padx=10, pady=10)
-
-    # Handle window close event
-    def on_close():
-        global config_window_instance
-        if config_window_instance:
-            config_window_instance.destroy()  # Destroy the window first
-            config_window_instance = None  # Reset the instance when the window is closed
-
-    config_window_instance.protocol("WM_DELETE_WINDOW", on_close)
 
 def browse_folder(entry_widget):
     """Open a folder dialog and set the selected path in the entry widget."""
