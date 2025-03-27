@@ -759,7 +759,9 @@ def open_config_window():
 
 def browse_folder(entry_widget):
     """Open a folder dialog and set the selected path in the entry widget."""
-    folder = filedialog.askdirectory(title="Select Folder")
+    current_path = entry_widget.get()
+    initial_dir = current_path if os.path.exists(current_path) else ""
+    folder = filedialog.askdirectory(title="Select Folder", initialdir=initial_dir)
     if folder:
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, folder)
