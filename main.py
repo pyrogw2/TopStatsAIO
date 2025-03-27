@@ -1002,7 +1002,18 @@ def open_config_window():
 
     # Add the save button at the bottom, spanning both columns
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
-        config_window_instance, elite_entry, top_stats_entry, None, None, None, None, parser_selection, theme_selection))
+        config_window_instance, 
+        elite_entry, 
+        top_stats_entry, 
+        old_top_stats_entry, 
+        token_entry, 
+        hour_entry, 
+        minute_entry, 
+        parser_selection, 
+        theme_selection,
+        guild_id_entry,
+        guild_name_entry,
+        api_key_entry))
     save_button.pack(anchor="e", padx=10, pady=10)
 
 def browse_folder(entry_widget):
@@ -1018,7 +1029,7 @@ def browse_folder(entry_widget):
     if config_window_instance:
         config_window_instance.lift()
 
-def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection):
+def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection, guild_id_entry, guild_name_entry, api_key_entry):
     """Save the changes and close the configuration popup."""
     elite_path = elite_entry.get()
     top_stats_path = top_stats_entry.get()
@@ -1067,6 +1078,7 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_s
     config["guild_id"] = guild_id_entry.get()
     config["api_key"] = api_key_entry.get()
 
+    # Save the configuration to the config.json file
     save_config()
 
     # Update the default time in the main window
