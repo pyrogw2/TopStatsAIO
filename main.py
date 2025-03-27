@@ -327,7 +327,7 @@ def on_tree_click(event):
 
                 # Determine the range of items
                 range_start = min(start_index, end_index)
-                range_end = max(start_index, end_index)
+                range_end = max(start_index, range_end)
 
                 # Check if the clicked item is selected or not
                 full_path = tree.item(item_id, "tags")[0]
@@ -943,6 +943,43 @@ def open_config_window():
     light_theme_radio = ttk.Radiobutton(theme_frame, text="Light Theme", variable=theme_selection, value="light")
     light_theme_radio.pack(anchor="w", padx=5)
 
+    # Add a new frame for GW2 EI Log Combiner Settings
+    combiner_settings_frame = ttk.LabelFrame(config_window_instance, text="GW2 EI Log Combiner Settings", padding=10)
+    combiner_settings_frame.pack(fill="both", expand=False, padx=10, pady=10)
+
+    # Guild Name
+    guild_name_frame = ttk.Frame(combiner_settings_frame)
+    guild_name_frame.pack(fill="x", pady=5)
+
+    guild_name_label = ttk.Label(guild_name_frame, text="Guild Name:")
+    guild_name_label.pack(side="left", padx=5)
+
+    guild_name_entry = ttk.Entry(guild_name_frame, width=50)
+    guild_name_entry.insert(0, config.get("guild_name", ""))  # Load saved value or default to empty
+    guild_name_entry.pack(side="left", padx=10)
+
+    # Guild ID
+    guild_id_frame = ttk.Frame(combiner_settings_frame)
+    guild_id_frame.pack(fill="x", pady=5)
+
+    guild_id_label = ttk.Label(guild_id_frame, text="Guild ID:")
+    guild_id_label.pack(side="left", padx=5)
+
+    guild_id_entry = ttk.Entry(guild_id_frame, width=50)
+    guild_id_entry.insert(0, config.get("guild_id", ""))  # Load saved value or default to empty
+    guild_id_entry.pack(side="left", padx=10)
+
+    # API Key
+    api_key_frame = ttk.Frame(combiner_settings_frame)
+    api_key_frame.pack(fill="x", pady=5)
+
+    api_key_label = ttk.Label(api_key_frame, text="API Key:")
+    api_key_label.pack(side="left", padx=5)
+
+    api_key_entry = ttk.Entry(api_key_frame, width=50, show="*")  # Mask the API key for privacy
+    api_key_entry.insert(0, config.get("api_key", ""))  # Load saved value or default to empty
+    api_key_entry.pack(side="left", padx=10)
+
     # Save Button
     save_button = ttk.Button(config_window_instance, text="Save", command=lambda: save_and_close_config(
         config_window_instance, elite_entry, top_stats_entry, old_top_stats_entry, token_entry, hour_entry, minute_entry, parser_selection, theme_selection))
@@ -1013,6 +1050,12 @@ def save_and_close_config(config_window, elite_entry, top_stats_entry, old_top_s
     config["default_minute"] = minute
     config["parser_selection"] = parser_selection.get()  # Save the parser selection
     config["theme"] = theme_selection.get()  # Save the selected theme
+
+    # Save the new GW2 EI Log Combiner settings
+    config["guild_name"] = guild_name_entry.get()
+    config["guild_id"] = guild_id_entry.get()
+    config["api_key"] = api_key_entry.get()
+
     save_config()
 
     # Update the default time in the main window
