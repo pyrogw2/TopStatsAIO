@@ -15,9 +15,8 @@ https://github.com/baaron4/GW2-Elite-Insights-Parser/releases
 1. Be sure to download the `GW2EICLI.zip` file.
 2. Extract the folder and put it someplace you don't mind it staying.
 ### 2. Download the GW2 EI Log Combiner
-https://github.com/Drevarr/GW2_EI_log_combiner
-1. Click the `<Code>` button and hit `Download ZIP`
-![image](https://github.com/user-attachments/assets/245f942b-f0dc-4cc5-8371-e1946fb47708)
+https://github.com/Drevarr/GW2_EI_log_combiner/releases
+1. Be sure to download  `TopStats_v...zip`
 2. Extract the ZIP and put it someplace you don't mind it staying.
 ### 3. Download the TopStatsAIO
 1. Head to the Releases [TopStatsAIO Releases](https://github.com/darkharasho/TopStatsAIO/releases) and download the latest ZIP

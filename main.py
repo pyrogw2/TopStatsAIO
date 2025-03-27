@@ -10,7 +10,6 @@ from tkinter import Toplevel, Label, ttk, messagebox
 import subprocess
 import threading
 import gzip
-import requests
 
 CONFIG_FILE = "config.json"
 
@@ -559,17 +558,21 @@ def generate_aggregate():
         # Start the processing in a separate thread
         threading.Thread(target=process_zevtc_files).start()
 
-        # Wait for processing to complete before running the Python script
+        # Wait for processing to complete before running the TopStats.exe executable
         def wait_and_run_script():
             processing_complete.wait()  # Wait for the event to be set
 
-            # Run the Python script
+            # Run the TopStats.exe executable
             try:
-                python_script = os.path.join(config.get("top_stats_path", ""), "tw5_top_stats.py")
+                top_stats_exe = os.path.join(config.get("top_stats_path", ""), "TopStats.exe")
                 processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
 
-                command = ["python", python_script, "-i", processed_folder_path]
-                update_terminal_output(f"Running Python script: {' '.join(command)}")
+                if not os.path.exists(top_stats_exe):
+                    update_terminal_output(f"Error: TopStats.exe not found at {top_stats_exe}")
+                    return
+
+                command = [top_stats_exe, "-i", processed_folder_path]
+                update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
 
                 # Run the command and wait for it to complete
                 result = subprocess.run(
@@ -583,9 +586,9 @@ def generate_aggregate():
                 if result.returncode != 0:
                     update_terminal_output(f"Error: {result.stderr.strip()}")
                     return
-                update_terminal_output("Python script completed successfully.")
+                update_terminal_output("TopStats.exe completed successfully.")
             except Exception as e:
-                update_terminal_output(f"Error running Python script: {e}")
+                update_terminal_output(f"Error running TopStats.exe: {e}")
 
             # Move the output .json file to the GeneratedAgg folder
             try:
@@ -638,7 +641,7 @@ def generate_aggregate():
                 enable_open_folder_button()  # Enable the button
 
             except Exception as e:
-                update_terminal_output(f"Error running Python script or moving output file: {e}")
+                update_terminal_output(f"Error running TopStats.exe or moving output file: {e}")
 
         # Start the script execution in a separate thread
         threading.Thread(target=wait_and_run_script).start()
