@@ -284,7 +284,7 @@ def on_tree_click(event):
             tree.item(item_id, open=True)  # Expand the folder
         return  # Exit early to avoid interfering with other functionality
 
-    # Handle Shift+Click for multi-selection
+    # Handle Shift+Click for multi-selection/unselection
     if event.state & 0x0001:  # Check if the Shift key is pressed
         if last_selected:
             # Get all items in the tree (recursively)
@@ -300,22 +300,33 @@ def on_tree_click(event):
                 start_index = all_items.index(last_selected)
                 end_index = all_items.index(item_id)
 
-                # Select all items between the last selected and the current item
-                for i in range(min(start_index, end_index), max(start_index, end_index) + 1):
+                # Determine the range of items
+                range_start = min(start_index, end_index)
+                range_end = max(start_index, end_index)
+
+                # Check if the clicked item is selected or not
+                full_path = tree.item(item_id, "tags")[0]
+                is_deselecting = full_path in checked_items
+
+                # Toggle selection/unselection for all items in the range
+                for i in range(range_start, range_end + 1):
                     current_item = all_items[i]
                     full_path = tree.item(current_item, "tags")[0]
-                    if full_path.lower().endswith(".zevtc") and full_path not in checked_items:
-                        checked_items[full_path] = True
-                        tree.item(current_item, text="✅ " + os.path.basename(full_path), tags=(full_path,))
-        last_selected = item_id
-        update_selected_list()
-        return
+                    if full_path.lower().endswith(".zevtc"):
+                        if is_deselecting:
+                            # Deselect the file
+                            if full_path in checked_items:
+                                del checked_items[full_path]
+                                tree.item(current_item, text=os.path.basename(full_path), tags=(full_path,))
+                        else:
+                            # Select the file
+                            if full_path not in checked_items:
+                                checked_items[full_path] = True
+                                tree.item(current_item, text="✅ " + os.path.basename(full_path), tags=(full_path,))
+                update_selected_list()
+                return
 
-    # Handle clicks on files or other regions
-    region = tree.identify("region", event.x, event.y)
-    if region != "tree":
-        return
-
+    # Handle single clicks on files
     full_path = tree.item(item_id, "tags")[0]
     if full_path.lower().endswith(".zevtc"):
         # Toggle selection for the clicked item
