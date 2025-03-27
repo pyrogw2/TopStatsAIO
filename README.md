@@ -28,19 +28,20 @@ https://github.com/Drevarr/GW2_EI_log_combiner/releases
 ![image](https://github.com/user-attachments/assets/d45a4b0f-44f6-4ea1-8ada-0a0d0f3d0e3e)
 6. In the config window, set the Elite Insights Parser and GW2 EI Log Combiner values to wherever you saved it in steps 1 & 2
 ![image](https://github.com/user-attachments/assets/9d56eb2d-f04e-4acd-a5f7-4bea5859dd65)
-7. **OPTIONALLY** You can set a `DPSReportUserToken` and `Default Hour` to allow for persistent DPS Report and default hour as your raid start time to allow for quick file selection
-8. Use the file tree on the left to expand folders and select .zetvc
-![image](https://github.com/user-attachments/assets/e017b720-d872-49f1-9b79-9b208bdbb148)
-9. As you select files, they should appear in the `Selected Files` window
-![image](https://github.com/user-attachments/assets/8ae1dac9-d7d1-405d-9fde-c35e4240e2de)
-10. After selection, hit the `Generate Aggregate` button at the bottom right of the window
-11. Let the process run, once complete you will see a button appear to `Open Folder`
-![image](https://github.com/user-attachments/assets/0a6b786b-ab30-4903-9050-b3502fa7e9c9)
-12. Drag & Drop that `.json` file into your TiddlyWiki of choice!
-#### OPTIONALLY
-You can use this app with the older [Drevarr/arcdps_top_stats_parser](https://github.com/Drevarr/arcdps_top_stats_parser) by going to config and setting the folder path as well as toggling on the `top_stats_parser` option.
+7. **OPTIONALLY**
+   - You can set a `DPSReportUserToken` and `Default Hour` to allow for persistent DPS Report and default hour as your raid start time to allow for quick file selection
+   - You can use this app with the older [Drevarr/arcdps_top_stats_parser](https://github.com/Drevarr/arcdps_top_stats_parser) by going to config and setting the folder path as well as toggling on the `top_stats_parser` option.
 
-![image](https://github.com/user-attachments/assets/a84bcfe6-73ce-4ec3-9435-4a261fd1cf5f)
+    ![image](https://github.com/user-attachments/assets/a84bcfe6-73ce-4ec3-9435-4a261fd1cf5f)
+
+9. Use the file tree on the left to expand folders and select .zetvc
+![image](https://github.com/user-attachments/assets/e017b720-d872-49f1-9b79-9b208bdbb148)
+10. As you select files, they should appear in the `Selected Files` window
+![image](https://github.com/user-attachments/assets/8ae1dac9-d7d1-405d-9fde-c35e4240e2de)
+11. After selection, hit the `Generate Aggregate` button at the bottom right of the window
+12. Let the process run, once complete you will see a button appear to `Open Folder`
+![image](https://github.com/user-attachments/assets/0a6b786b-ab30-4903-9050-b3502fa7e9c9)
+13. Drag & Drop that `.json` file into your TiddlyWiki of choice!
 
 ## NOTE
 This generates the `json`/`tid` files necessary to use with TiddlyWiki. To see the actual results, please follow the steps in the [GW2 EI Log Parser](https://github.com/Drevarr/GW2_EI_log_combiner?tab=readme-ov-file#gw2_ei_log_combiner--):
