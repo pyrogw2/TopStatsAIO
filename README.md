@@ -42,6 +42,12 @@ You can use this app with the older [Drevarr/arcdps_top_stats_parser](https://gi
 
 ![image](https://github.com/user-attachments/assets/a84bcfe6-73ce-4ec3-9435-4a261fd1cf5f)
 
+## NOTE
+This generates the `json`/`tid` files necessary to use with TiddlyWiki. To see the actual results, please follow the steps in the [GW2 EI Log Parser](https://github.com/Drevarr/GW2_EI_log_combiner?tab=readme-ov-file#gw2_ei_log_combiner--):
+- Navigate to your `Top Stats Parser` Folder
+- Open the file `/Example_Output/Top_Stats_Index.html` in your browser of choice.
+- Drag and Drop the file `Drag_and_Drop_Log_Summary_for_2024yourdatatime.json` onto the opened `Top_Stats_Index.html` in your browser and click import
+- Open the 1. imported file link to view the summary
 
 ## Local Dev
 ### Compile EXE
