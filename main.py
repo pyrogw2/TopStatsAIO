@@ -738,12 +738,18 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
         try:
             top_stats_exe = os.path.join(config.get("top_stats_path", ""), "TopStats.exe")
             processed_folder_path = os.path.abspath(os.path.join(temp_dir, "ProcessedLogs"))
+            top_stats_config_path = os.path.join(temp_dir, "top_stats_config.ini")  # Path to the edited config file
 
             if not os.path.exists(top_stats_exe):
                 update_terminal_output(f"Error: TopStats.exe not found at {top_stats_exe}")
                 return
 
-            command = [top_stats_exe, "-i", processed_folder_path]
+            if not os.path.exists(top_stats_config_path):
+                update_terminal_output(f"Error: top_stats_config.ini not found at {top_stats_config_path}")
+                return
+
+            # Add the -c flag with the path to the top_stats_config.ini file
+            command = [top_stats_exe, "-i", processed_folder_path, "-c", top_stats_config_path]
             update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
 
             # Run the command and wait for it to complete
