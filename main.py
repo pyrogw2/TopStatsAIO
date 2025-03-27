@@ -429,13 +429,14 @@ def generate_aggregate():
         terminal_output.see(tk.END)  # Scroll to the bottom
         terminal_output.config(state="disabled")
 
-    # Define a custom style for the green button
+    # Define a custom style for the button
     style = ttk.Style()
-    style.configure("Green.TButton", background="#28a745", foreground="white", font=("Arial", 10, "bold"))
+    style.configure("Accent.TButton", background="#28a745", foreground="white", font=("Arial", 10, "bold"))
+    style.configure("TButton", font=("Arial", 10))  # Default style for buttons
     style.map(
-        "Green.TButton",
-        background=[("active", "#218838"), ("disabled", "#6c757d")],  # Darker green when active, gray when disabled
-        foreground=[("disabled", "#ffffff")],
+        "TButton",
+        background=[("disabled", "#6c757d")],  # Gray background when disabled
+        foreground=[("disabled", "#ffffff")],  # White text when disabled
     )
 
     # Create a frame for the button at the bottom of the popup
@@ -454,10 +455,18 @@ def generate_aggregate():
     open_folder_button.pack(pady=5)
 
     def enable_open_folder_button():
-        open_folder_button.config(state="normal", style="Green.TButton")  # Enable the button and apply the green style
+        """Enable the 'Open Folder' button and update its text and style."""
+        open_folder_button.config(state="normal", text="Open Folder", style="Accent.TButton")  # Enable the button and apply the green style
+
+    def disable_open_folder_button():
+        """Disable the 'Open Folder' button and update its text to 'Processing...'."""
+        open_folder_button.config(state="disabled", text="Processing...", style="TButton")  # Disable the button and update the text
 
     def process_files():
         try:
+            # Disable the "Open Folder" button and set it to "Processing..."
+            disable_open_folder_button()
+
             # Copy selected files to the temporary folder
             total_files = len(checked_items)
             update_terminal_output(f"Copying {total_files} selected files to temporary folder...")
@@ -487,6 +496,9 @@ def generate_aggregate():
                 update_terminal_output(f"Unknown parser selection: {parser_selection}")
         except Exception as e:
             update_terminal_output(f"Unexpected error: {e}")
+        finally:
+            # Enable the "Open Folder" button after processing is complete
+            enable_open_folder_button()
 
     # Run the file processing in a separate thread
     threading.Thread(target=process_files).start()
