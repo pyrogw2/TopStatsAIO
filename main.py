@@ -198,6 +198,12 @@ main_frame = ttk.LabelFrame(root, text="File Selection", padding=10)
 main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 main_frame.rowconfigure(0, weight=1)
 main_frame.columnconfigure(0, weight=1)
+# Set a default starting size for the main window
+root.geometry("1200x900")  # Width x Height
+
+# Allow the window to be resizable
+root.resizable(True, True)
+main_frame.grid_propagate(False)
 
 # Treeview container frame
 tree_frame = ttk.Frame(main_frame)
