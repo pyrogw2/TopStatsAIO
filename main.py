@@ -145,6 +145,21 @@ def clear_tree_checkboxes(item):
     for child in tree.get_children(item):
         clear_tree_checkboxes(child)
 
+# Check for Wine on Linux systems
+if os.name != 'nt':
+    try:
+        wine_check = subprocess.run(['which', 'wine'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if wine_check.returncode != 0:
+            print("ERROR: Wine is not installed. This application requires Wine to run Windows executables on Linux.")
+            print("Please install Wine using your distribution's package manager.")
+            print("For example: 'sudo apt install wine' on Ubuntu/Debian or 'sudo dnf install wine' on Fedora")
+            exit(1)
+    except Exception as e:
+        print(f"Error checking for Wine: {e}")
+        print("This application requires Wine to run Windows executables on Linux.")
+        print("Please install Wine using your distribution's package manager.")
+        exit(1)
+
 # App window
 root = tk.Tk()
 root.title("GW2 arcdps File Selector")
@@ -225,11 +240,16 @@ tree_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=tree_scroll.set)
 tree_scroll.grid(row=0, column=1, sticky="ns")
 
-# Filter by date section
-filter_frame = ttk.LabelFrame(root, text="Filter by Date", padding=10)
-filter_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
+# Create a frame for filter and description
+filter_section_frame = ttk.Frame(root)
+filter_section_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
+filter_section_frame.columnconfigure(1, weight=1)  # Make description frame expandable
 
-date_label = ttk.Label(filter_frame, text="Select all logs modified after (YYYY-MM-DD HH:MM):")
+# Filter by date section
+filter_frame = ttk.LabelFrame(filter_section_frame, text="Filter by Date", padding=10)
+filter_frame.grid(row=0, column=0, sticky="ns", padx=(0, 5))
+
+date_label = ttk.Label(filter_frame, text="Select logs after (YYYY-MM-DD HH:MM):")
 date_label.pack(side="left", padx=5)
 
 # Use ttk.Entry with the Forest theme
@@ -239,6 +259,19 @@ date_entry.insert(0, get_default_time())  # Use the dynamically calculated defau
 
 select_after_button = ttk.Button(filter_frame, text="Select Recent Logs", command=select_files_after_date)
 select_after_button.pack(side="left", padx=5)
+
+# Description section - now alongside date filter
+description_frame = ttk.LabelFrame(filter_section_frame, text="Optional Description", padding=10)
+description_frame.grid(row=0, column=1, sticky="ew", padx=(5, 0))
+description_frame.columnconfigure(0, weight=1)  # Make the entry field expandable
+
+# Use ttk.Entry with the Forest theme - expandable
+description_entry = ttk.Entry(description_frame)
+description_entry.grid(row=0, column=0, padx=5, sticky="ew")
+
+# Add a small note about version requirement
+version_note = ttk.Label(description_frame, text="(Requires v0.9.9.26a+)", font=("Arial", 7), foreground="#888888")
+version_note.grid(row=0, column=1, padx=2, sticky="e")
 
 # Selected files section
 selected_frame = ttk.LabelFrame(main_frame, text="Selected Files", padding=10)
@@ -487,12 +520,23 @@ def generate_aggregate():
 
     # Add the "Open Folder" button (initially disabled)
     generated_agg_folder = os.path.join(os.getcwd(), "GeneratedAgg")
+    # Define a function to open a folder that works on both Windows and Linux
+    def open_folder(path):
+        if os.name == 'nt':
+            os.startfile(path)
+        else:
+            # On Linux, use xdg-open or similar
+            try:
+                subprocess.run(['xdg-open', path])
+            except Exception as e:
+                update_terminal_output(f"Error opening folder: {e}")
+                
     open_folder_button = ttk.Button(
         button_frame,
         text="Open Folder",
         state="disabled",
         style="TButton",  # Default style
-        command=lambda: os.startfile(generated_agg_folder),
+        command=lambda: open_folder(generated_agg_folder),
     )
     open_folder_button.pack(pady=5)
 
@@ -560,25 +604,48 @@ def process_with_arcdps_top_stats_parser(temp_dir, update_terminal_output, enabl
             update_terminal_output(f"Error: Elite Insights folder not found: {ei_folder}")
             return
 
-        # Construct the batch command
-        bash_command = f'"{top_stats_folder}\\TW5_parsing_arc_top_stats.bat" "{target_folder}" "{ei_folder}" "{top_stats_folder}"'
+        # Construct the batch command with Wine if on Linux
+        if os.name != 'nt':
+            bash_command = f'wine cmd /c "{top_stats_folder}\\TW5_parsing_arc_top_stats.bat" "{target_folder}" "{ei_folder}" "{top_stats_folder}"'
+        else:
+            bash_command = f'"{top_stats_folder}\\TW5_parsing_arc_top_stats.bat" "{target_folder}" "{ei_folder}" "{top_stats_folder}"'
         update_terminal_output(f"Running command: {bash_command}")
 
         # Run the batch command and pipe the output to the terminal
-        result = subprocess.run(
-            bash_command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
-        )
+        # Check platform to determine if we should use creationflags
+        kwargs = {
+            'shell': True,
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
+        }
+        
+        # Only add creationflags on Windows
+        if os.name == 'nt':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+            kwargs['text'] = True
+        else:
+            # On Linux running Wine, don't use text=True to avoid encoding errors
+            kwargs['text'] = False
+            
+        result = subprocess.run(bash_command, **kwargs)
 
-        # Pipe the output to the terminal
-        if result.stdout:
-            update_terminal_output(result.stdout.strip())
-        if result.stderr:
-            update_terminal_output(f"Error: {result.stderr.strip()}")
+        # Handle output based on whether we're in text or binary mode
+        if kwargs['text']:
+            if result.stdout:
+                update_terminal_output(result.stdout.strip())
+            if result.stderr:
+                update_terminal_output(f"Error: {result.stderr.strip()}")
+        else:
+            # Handle binary output with error handling for encoding issues
+            try:
+                if result.stdout:
+                    stdout_text = result.stdout.decode('utf-8', errors='replace').strip()
+                    update_terminal_output(stdout_text)
+                if result.stderr:
+                    stderr_text = result.stderr.decode('utf-8', errors='replace').strip()
+                    update_terminal_output(f"Error: {stderr_text}")
+            except Exception as e:
+                update_terminal_output(f"Warning: Output encoding issue: {str(e)}")
 
         if result.returncode != 0:
             update_terminal_output(f"Batch command failed with return code {result.returncode}")
@@ -684,18 +751,48 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
                 zevtc_files = [file for file in os.listdir(temp_dir) if file.lower().endswith(".zevtc")]
                 for i, file in enumerate(zevtc_files, start=1):
                     file_path = os.path.join(temp_dir, file)
-                    command = [ei_exec, "-c", edited_conf_file, file_path]
+                    # Check if we're running on Linux and need to use Wine
+                    if os.name != 'nt' and ei_exec.lower().endswith('.exe'):
+                        command = ["wine", ei_exec, "-c", edited_conf_file, file_path]
+                    else:
+                        command = [ei_exec, "-c", edited_conf_file, file_path]
                     update_terminal_output(f"[{i}/{len(zevtc_files)}] Processing: {file}")
-                    result = subprocess.run(
-                        command,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
-                    )
-                    update_terminal_output(result.stdout.strip())
+                    # Check platform to determine if we should use creationflags
+                    kwargs = {
+                        'stdout': subprocess.PIPE,
+                        'stderr': subprocess.PIPE,
+                    }
+                    
+                    # Only add creationflags on Windows
+                    if os.name == 'nt':
+                        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+                        kwargs['text'] = True
+                    else:
+                        # On Linux running Wine, don't use text=True to avoid encoding errors
+                        kwargs['text'] = False
+                        
+                    result = subprocess.run(command, **kwargs)
+                    
+                    # Handle output based on whether we're in text or binary mode
+                    if kwargs['text']:
+                        if result.stdout:
+                            update_terminal_output(result.stdout.strip())
+                        if result.stderr and result.returncode != 0:
+                            update_terminal_output(f"Error: {result.stderr.strip()}")
+                    else:
+                        # Handle binary output with error handling for encoding issues
+                        try:
+                            if result.stdout:
+                                stdout_text = result.stdout.decode('utf-8', errors='replace').strip()
+                                update_terminal_output(stdout_text)
+                            if result.stderr and result.returncode != 0:
+                                stderr_text = result.stderr.decode('utf-8', errors='replace').strip()
+                                update_terminal_output(f"Error: {stderr_text}")
+                        except Exception as e:
+                            update_terminal_output(f"Warning: Output encoding issue: {str(e)}")
+                            
                     if result.returncode != 0:
-                        update_terminal_output(f"Error: {result.stderr.strip()}")
+                        update_terminal_output(f"Error processing file (return code: {result.returncode})")
             except Exception as e:
                 update_terminal_output(f"Error processing files with Elite Insights: {e}")
                 processing_complete.set()  # Signal completion
@@ -755,20 +852,57 @@ def process_with_gw2_ei_log_combiner(temp_dir, update_terminal_output, enable_op
                 return
 
             # Add the -c flag with the path to the top_stats_config.ini file
-            command = [top_stats_exe, "-i", processed_folder_path, "-c", top_stats_config_path]
+            # Check if we're running on Linux and need to use Wine
+            command = []
+            if os.name != 'nt' and top_stats_exe.lower().endswith('.exe'):
+                command = ["wine", top_stats_exe, "-i", processed_folder_path, "-c", top_stats_config_path]
+            else:
+                command = [top_stats_exe, "-i", processed_folder_path, "-c", top_stats_config_path]
+            
+            # Add optional description if provided
+            description = description_entry.get().strip()
+            if description:
+                command.extend(["-d", description])
+                
             update_terminal_output(f"Running TopStats.exe: {' '.join(command)}")
 
             # Run the command and wait for it to complete
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
-            )
-            update_terminal_output(result.stdout.strip())
+            # Check platform to determine if we should use creationflags
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+            }
+            
+            # Only add creationflags on Windows
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW  # Prevent new terminal window
+                kwargs['text'] = True
+            else:
+                # On Linux running Wine, don't use text=True to avoid encoding errors
+                kwargs['text'] = False
+                
+            result = subprocess.run(command, **kwargs)
+            
+            # Handle output based on whether we're in text or binary mode
+            if kwargs['text']:
+                if result.stdout:
+                    update_terminal_output(result.stdout.strip())
+                if result.stderr and result.returncode != 0:
+                    update_terminal_output(f"Error: {result.stderr.strip()}")
+            else:
+                # Handle binary output with error handling for encoding issues
+                try:
+                    if result.stdout:
+                        stdout_text = result.stdout.decode('utf-8', errors='replace').strip()
+                        update_terminal_output(stdout_text)
+                    if result.stderr and result.returncode != 0:
+                        stderr_text = result.stderr.decode('utf-8', errors='replace').strip()
+                        update_terminal_output(f"Error: {stderr_text}")
+                except Exception as e:
+                    update_terminal_output(f"Warning: Output encoding issue: {str(e)}")
+            
             if result.returncode != 0:
-                update_terminal_output(f"Error: {result.stderr.strip()}")
+                update_terminal_output(f"Error running TopStats.exe (return code: {result.returncode})")
                 return
             update_terminal_output("TopStats.exe completed successfully.")
         except Exception as e:
