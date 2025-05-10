@@ -365,7 +365,7 @@ def on_tree_click(event):
                 end_index = all_items.index(item_id)
 
                 # Determine the range of items
-                range_start = min(start_index, end_index)
+                range_start = min(start_index, range_end)
                 range_end = max(start_index, end_index)
 
                 # Check if the clicked item is selected or not
@@ -1443,7 +1443,7 @@ def download_gw2eicli(parent_window):
     threading.Thread(target=download_thread, daemon=True).start()
 
 def download_gw2_ei_log_combiner(parent_window):
-    """Download the latest GW2 EI Log Combiner prerelease from GitHub."""
+    """Download the latest GW2 EI Log Combiner release from GitHub."""
     # Create a progress dialog
     progress_dialog = Toplevel(parent_window)
     progress_dialog.title("Downloading GW2 EI Log Combiner")
@@ -1462,7 +1462,7 @@ def download_gw2_ei_log_combiner(parent_window):
         label_fg = "#000000"  # Black text
 
     # Add status label
-    status_label = ttk.Label(progress_dialog, text="Fetching latest prerelease information...", foreground=label_fg)
+    status_label = ttk.Label(progress_dialog, text="Fetching latest release information...", foreground=label_fg)
     status_label.pack(pady=20)
 
     # Add progress bar
@@ -1472,32 +1472,16 @@ def download_gw2_ei_log_combiner(parent_window):
 
     def download_thread():
         try:
-            # Step 1: Get the latest prerelease information
-            status_label.config(text="Fetching latest prerelease information...")
-            api_url = "https://api.github.com/repos/Drevarr/GW2_EI_log_combiner/releases?per_page=10"
+            # Step 1: Get the latest release information
+            status_label.config(text="Fetching latest release information...")
+            api_url = "https://api.github.com/repos/Drevarr/GW2_EI_log_combiner/releases/latest"
             response = requests.get(api_url)
             response.raise_for_status()
-            releases_data = response.json()
+            release_data = response.json()
 
-            # Find the latest prerelease
-            prerelease = None
-            for release in releases_data:
-                if release.get("prerelease", False):
-                    prerelease = release
-                    break
-
-            if not prerelease:
-                progress_dialog.after(0, lambda: messagebox.showerror(
-                    "Download Error",
-                    "No prereleases found for GW2 EI Log Combiner",
-                    parent=progress_dialog
-                ))
-                progress_dialog.after(100, progress_dialog.destroy)
-                return
-
-            # Step 2: Find the asset (assuming it's a zip file)
+            # Step 2: Find the zip asset
             zip_asset = None
-            for asset in prerelease.get("assets", []):
+            for asset in release_data.get("assets", []):
                 if asset["name"].endswith(".zip"):
                     zip_asset = asset
                     break
@@ -1505,7 +1489,7 @@ def download_gw2_ei_log_combiner(parent_window):
             if not zip_asset:
                 progress_dialog.after(0, lambda: messagebox.showerror(
                     "Download Error",
-                    "No zip file found in the latest prerelease",
+                    "No zip file found in the latest release",
                     parent=progress_dialog
                 ))
                 progress_dialog.after(100, progress_dialog.destroy)
@@ -1533,7 +1517,6 @@ def download_gw2_ei_log_combiner(parent_window):
 
                 # Default to the dedicated directory, but allow user to choose
                 initial_dir = config.get("top_stats_path", "") if os.path.exists(config.get("top_stats_path", "")) else combiner_dir
-                # Ask if user wants to use the default directory
                 use_default = messagebox.askyesno(
                     "Installation Directory",
                     f"Do you want to install GW2 EI Log Combiner to the default location?\n\n{combiner_dir}",
@@ -1579,7 +1562,7 @@ def download_gw2_ei_log_combiner(parent_window):
                     if "prerequisites" not in config:
                         config["prerequisites"] = {}
 
-                    config["prerequisites"]["GW2_EI_log_combiner_version"] = prerelease.get("tag_name", "unknown")
+                    config["prerequisites"]["GW2_EI_log_combiner_version"] = release_data.get("tag_name", "unknown")
                     config["prerequisites"]["GW2_EI_log_combiner_downloaded"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     save_config()
