@@ -1472,28 +1472,48 @@ def download_gw2_ei_log_combiner(parent_window):
 
     def download_thread():
         try:
-            # Step 1: Get the latest release information
+            # Step 1: Get all releases (including pre-releases) to find the most recent
             status_label.config(text="Fetching latest release information...")
-            api_url = "https://api.github.com/repos/Drevarr/GW2_EI_log_combiner/releases/latest"
+            api_url = "https://api.github.com/repos/Drevarr/GW2_EI_log_combiner/releases"
             response = requests.get(api_url)
             response.raise_for_status()
-            release_data = response.json()
+            all_releases = response.json()
 
-            # Step 2: Find the zip asset
+            if not all_releases:
+                progress_dialog.after(0, lambda: messagebox.showerror(
+                    "Download Error",
+                    "No releases found for GW2_EI_log_combiner",
+                    parent=progress_dialog
+                ))
+                progress_dialog.after(100, progress_dialog.destroy)
+                return
+
+            # Step 2: Find the most recent release (stable or pre-release) with a zip asset
+            release_data = None
             zip_asset = None
-            for asset in release_data.get("assets", []):
-                if asset["name"].endswith(".zip"):
-                    zip_asset = asset
+            
+            for release in all_releases:
+                # Check if this release has a zip asset
+                for asset in release.get("assets", []):
+                    if asset["name"].endswith(".zip"):
+                        release_data = release
+                        zip_asset = asset
+                        break
+                if zip_asset:
                     break
 
             if not zip_asset:
                 progress_dialog.after(0, lambda: messagebox.showerror(
                     "Download Error",
-                    "No zip file found in the latest release",
+                    "No zip file found in any available releases",
                     parent=progress_dialog
                 ))
                 progress_dialog.after(100, progress_dialog.destroy)
                 return
+            
+            # Display which type of release we're downloading
+            release_type = "pre-release" if release_data.get("prerelease", False) else "release"
+            status_label.config(text=f"Found latest {release_type}: {release_data.get('tag_name', 'unknown')}")
 
             # Step 3: Download the zip file
             status_label.config(text=f"Downloading {zip_asset['name']}...")
@@ -1574,9 +1594,11 @@ def download_gw2_ei_log_combiner(parent_window):
                     progress_dialog.after(1000, progress_dialog.destroy)
 
                     # Show success message
+                    release_type = "pre-release" if release_data.get("prerelease", False) else "release"
+                    version = release_data.get("tag_name", "unknown")
                     messagebox.showinfo(
                         "Download Complete",
-                        f"GW2 EI Log Combiner has been downloaded and installed to:\n{install_dir}\n\nThe application configuration has been automatically updated to use this path.",
+                        f"GW2 EI Log Combiner ({release_type} {version}) has been downloaded and installed to:\n{install_dir}\n\nThe application configuration has been automatically updated to use this path.",
                         parent=parent_window
                     )
                 except Exception as e:
